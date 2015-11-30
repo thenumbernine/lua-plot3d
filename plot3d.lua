@@ -56,8 +56,10 @@ local function plot3d(graphs, numRows, fontfile)
 				assert(#data == length, "data mismatched length, found "..#data.." expected "..length)
 			end
 			for _,value in ipairs(data) do
-				if not graph.mins[i] then graph.mins[i] = value else graph.mins[i] = math.min(graph.mins[i], value) end
-				if not graph.maxs[i] then graph.maxs[i] = value else graph.maxs[i] = math.max(graph.maxs[i], value) end
+				if value ~= math.huge and value ~= -math.huge and value == value then
+					if not graph.mins[i] then graph.mins[i] = value else graph.mins[i] = math.min(graph.mins[i], value) end
+					if not graph.maxs[i] then graph.maxs[i] = value else graph.maxs[i] = math.max(graph.maxs[i], value) end
+				end
 			end
 		end
 		graph.length = length
