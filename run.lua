@@ -21,6 +21,8 @@ while true do
 		files:last().cols = getarg():split':':map(function(x) return tonumber(x) end)
 	elseif arg == 'title' then
 		files:last().title = getarg()
+	elseif arg == 'color' then
+		files:last().color = getarg():split',':map(function(x) return tonumber(x) end)
 	else
 		files:insert{name=arg}
 	end
@@ -28,8 +30,8 @@ end
 
 local dataForFile = {}
 local graphs = table()
-for _,fi in ipairs(files) do
-	local fn = fi.name
+for _,fileInfo in ipairs(files) do
+	local fn = fileInfo.name
 	if not io.fileexists(fn) then
 		io.stderr:write('file '..tostring(fn)..' does not exist\n')
 		io.stderr:flush()
@@ -67,7 +69,7 @@ for _,fi in ipairs(files) do
 			end
 		end
 
-		local title = fi.title or fn
+		local title = fileInfo.title or fn
 
 		-- make sure title is unique
 		if graphs[title] then
@@ -81,7 +83,8 @@ for _,fi in ipairs(files) do
 
 		graphs[title] = setmetatable(table(g), nil)	-- soft copy, so don't mess with data ...
 		graphs[title].enabled = true
-		graphs[title].cols = fi.cols
+		graphs[title].cols = fileInfo.cols
+		graphs[title].color = fileInfo.color
 	end
 end
 

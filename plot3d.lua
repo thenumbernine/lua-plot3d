@@ -23,8 +23,6 @@ local tanFovY = .5
 
 local quad = {{0,0}, {1,0}, {1,1}, {0,1}}
 
-local mins, maxs
-
 --[[
 graphs = {
 	[name] = {
@@ -56,12 +54,16 @@ local function plot3d(graphs, numRows, fontfile)
 				assert(#data == length, "data mismatched length, found "..#data.." expected "..length)
 			end
 			for _,value in ipairs(data) do
-				if value ~= math.huge and value ~= -math.huge and value == value then
+				if math.isfinite(value) then
 					if not graph.mins[i] then graph.mins[i] = value else graph.mins[i] = math.min(graph.mins[i], value) end
 					if not graph.maxs[i] then graph.maxs[i] = value else graph.maxs[i] = math.max(graph.maxs[i], value) end
 				end
 			end
 		end
+	
+		print('mins', unpack(graph.mins))
+		print('maxs', unpack(graph.maxs))
+	
 		graph.length = length
 	end
 
@@ -302,16 +304,14 @@ local function plot3d(graphs, numRows, fontfile)
 								for j,i in ipairs(indexes) do
 									for k=1,3 do
 										local x = graph[cols[k]][i]
-										if x == math.huge or x == -math.huge or x ~= x then
-											bad = true
-										end
+										bad = bad or not math.isfinite(x) 
 										x = (x - graph.mins[cols[k]]) / (graph.maxs[cols[k]] - graph.mins[cols[k]]) * 2 - 1
 										qvtx[j][k] = x
 									end
 								end
 								if not bad then
 									for j=1,4 do
-										gl.glVertex3d(table.unpack(qvtx[j]))
+										gl.glVertex3d(unpack(qvtx[j]))
 									end
 								end
 							end
@@ -325,7 +325,7 @@ local function plot3d(graphs, numRows, fontfile)
 							for j=1,3 do
 								v[j] = (v[j] - graph.mins[cols[j]]) / (graph.maxs[cols[j]] - graph.mins[cols[j]]) * 2 - 1
 							end
-							gl.glVertex3d(table.unpack(v))
+							gl.glVertex3d(unpack(v))
 						end
 						gl.glEnd()
 					end
@@ -340,7 +340,37 @@ local function plot3d(graphs, numRows, fontfile)
 		glCallOrRun(list)
 		gl.glEnable(gl.GL_DEPTH_TEST)
 		gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
+
+		local function drawRuler(args)
+			local ticks = args.ticks or 5
+			gl.glColor3f(1,1,1)
+			gl.glBegin(gl.GL_LINES)
+			gl.glVertex3f(unpack(args.p1))
+			gl.glVertex3f(unpack(args.p2))
+			local d = args.p2 - args.p1
+			for i=0,ticks do
+				gl.glVertex3f(unpack(args.p1 + d*(i/ticks) + args.perp*.1))
+				gl.glVertex3f(unpack(args.p1 + d*(i/ticks) - args.perp*.1))
+			end
+			gl.glEnd()
+		end
 		
+		-- project view -z
+		local right = viewRot:conjugate():xAxis()
+		local fwd = -viewRot:conjugate():zAxis()
+
+		-- draw a box around it
+		-- draw tickers along each axis at specific spacing ... 5 tics per axii? 
+		local v = vec3()
+		v[1] = (right[1] < 0) and -1 or 1
+		v[2] = (right[2] < 0) and -1 or 1
+		v[3] = -1
+		drawRuler{
+			p1=vec3(v[1], v[2], v[3]),
+			p2=vec3(v[1], v[2], -v[3]),
+			perp=fwd:cross(vec3(0,0,1)),
+		}
+
 		gui:update()
 	end
 	local plot3dapp = Plot3DApp()
