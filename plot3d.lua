@@ -36,10 +36,23 @@ graphs = {
 --]]
 local function plot3d(graphs, numRows, fontfile)
 
+	local colors = {
+		vec3(1,0,0),
+		vec3(1,1,0),
+		vec3(0,1,0),
+		vec3(0,1,1),
+		vec3(.5,.5,1),
+		vec3(1,0,1),
+	}
+
 	for name,graph in pairs(graphs) do
 		if not graph.color then
-			local c = vec3(math.random(),math.random(),math.random())
-			c = c / math.max(unpack(c))
+			local h = math.random() * #colors + 1
+			local hi = math.floor(h)
+			local hii = hi % #colors + 1
+			local f = h - hi
+			local c = colors[hi] * f + colors[hii] * (1 - f)
+			--c = c / math.max(unpack(c))
 			graph.color = c
 		end
 		if not graph.cols then
@@ -90,9 +103,10 @@ local function plot3d(graphs, numRows, fontfile)
 		maxs = {}
 		for _,graph in pairs(graphs) do
 			if graph.enabled then
-				for i,data in ipairs(graph) do
-					if not mins[i] then mins[i] = graph.mins[i] else mins[i] = math.min(mins[i], graph.mins[i]) end
-					if not maxs[i] then maxs[i] = graph.maxs[i] else maxs[i] = math.max(maxs[i], graph.maxs[i]) end
+				local cols = graph.cols
+				for i=1,3 do 
+					mins[i] = math.min(mins[i] or graph.mins[cols[i]], graph.mins[cols[i]])
+					maxs[i] = math.max(maxs[i] or graph.maxs[cols[i]], graph.maxs[cols[i]])
 				end
 			end
 		end
@@ -294,7 +308,7 @@ local function plot3d(graphs, numRows, fontfile)
 									vecs[i] = vec3(graph[cols[1]][index], graph[cols[2]][index], graph[cols[3]][index])
 									-- position data in center of view
 									for j=1,3 do
-										vecs[i][j] = (vecs[i][j] - graph.mins[cols[j]]) / (graph.maxs[cols[j]] - graph.mins[cols[j]]) * 2 - 1
+										vecs[i][j] = (vecs[i][j] - mins[j]) / (maxs[j] - mins[j]) * 2 - 1
 									end
 								end
 								local dx = (vecs[2] - vecs[1] + vecs[3] - vecs[4]) * .5
@@ -306,7 +320,7 @@ local function plot3d(graphs, numRows, fontfile)
 									for k=1,3 do
 										local x = graph[cols[k]][i]
 										bad = bad or not math.isfinite(x) 
-										x = (x - graph.mins[cols[k]]) / (graph.maxs[cols[k]] - graph.mins[cols[k]]) * 2 - 1
+										x = (x - mins[k]) / (maxs[k] - mins[k]) * 2 - 1
 										qvtx[j][k] = x
 									end
 								end
@@ -324,7 +338,7 @@ local function plot3d(graphs, numRows, fontfile)
 						for i=1,graph.length do
 							local v = {graph[cols[1]][i], graph[cols[2]][i], graph[cols[3]][i]}
 							for j=1,3 do
-								v[j] = (v[j] - graph.mins[cols[j]]) / (graph.maxs[cols[j]] - graph.mins[cols[j]]) * 2 - 1
+								v[j] = (v[j] - mins[j]) / (maxs[j] - mins[j]) * 2 - 1
 							end
 							gl.glVertex3d(unpack(v))
 						end
@@ -410,52 +424,47 @@ local function plot3d(graphs, numRows, fontfile)
 		local right = viewRot:conjugate():xAxis()
 		local fwd = -viewRot:conjugate():zAxis()
 
-		for _,graph in pairs(graphs) do
-			local cols = graph.cols
-			
-			-- draw a box around it
-			-- draw tickers along each axis at specific spacing ... 5 tics per axii? 
-			local v = vec3()
-			v[1] = (right[1] < 0) and -1 or 1
-			v[2] = (right[2] < 0) and -1 or 1
-			v[3] = -1
+		-- draw a box around it
+		-- draw tickers along each axis at specific spacing ... 5 tics per axii? 
+		local v = vec3()
+		v[1] = (right[1] < 0) and -1 or 1
+		v[2] = (right[2] < 0) and -1 or 1
+		v[3] = -1
 
-			for j=1,3 do
-				local from = graph.mins[cols[j]]
-				local to = graph.maxs[cols[j]]
-				if v[j] > 0 then from,to = to,from end
-				local fromPt = vec3(unpack(v))
-				local toPt = vec3(unpack(v))
-				toPt[j] = -toPt[j]
-				local axis = vec3(0,0,0)
-				axis[j] = 1
-				drawTicks{
-					p1=fromPt,
-					p2=toPt,
-					perp=fwd:cross(axis),
-					from=from,
-					to=to,
-				}
-			end
-			
-			local bottomVtxs = {
-				vec3(-1,-1,-1),
-				vec3(1,-1,-1),
-				vec3(1,1,-1),
-				vec3(-1,1,-1),
+		for j=1,3 do
+			local from = mins[j]
+			local to = maxs[j]
+			if v[j] > 0 then from,to = to,from end
+			local fromPt = vec3(unpack(v))
+			local toPt = vec3(unpack(v))
+			toPt[j] = -toPt[j]
+			local axis = vec3(0,0,0)
+			axis[j] = 1
+			drawTicks{
+				p1=fromPt,
+				p2=toPt,
+				perp=fwd:cross(axis),
+				from=from,
+				to=to,
 			}
-			for i=1,4 do
-				-- TODO only draw if not in the front
-				drawLine{
-					p1=bottomVtxs[i],
-					p2=bottomVtxs[i%4+1],
-				}
-				drawLine{
-					p1=bottomVtxs[i],
-					p2=bottomVtxs[i]+vec3(0,0,2),
-				}
-			end
-
+		end
+		
+		local bottomVtxs = {
+			vec3(-1,-1,-1),
+			vec3(1,-1,-1),
+			vec3(1,1,-1),
+			vec3(-1,1,-1),
+		}
+		for i=1,4 do
+			-- TODO only draw if not in the front
+			drawLine{
+				p1=bottomVtxs[i],
+				p2=bottomVtxs[i%4+1],
+			}
+			drawLine{
+				p1=bottomVtxs[i],
+				p2=bottomVtxs[i]+vec3(0,0,2),
+			}
 		end
 		
 		gl.glEnable(gl.GL_DEPTH_TEST)
