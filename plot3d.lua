@@ -41,8 +41,8 @@ local function plot3d(graphs, numRows, fontfile)
 		vec3(1,1,0),
 		vec3(0,1,0),
 		vec3(0,1,1),
-		vec3(.5,.5,1),
-		vec3(1,0,1),
+		vec3(.3,.3,1),
+		vec3(1,.2,1),
 	}
 
 	for name,graph in pairs(graphs) do
@@ -52,6 +52,9 @@ local function plot3d(graphs, numRows, fontfile)
 			local hii = hi % #colors + 1
 			local f = h - hi
 			local c = colors[hi] * f + colors[hii] * (1 - f)
+			-- add luminance
+			local s = .1
+			c = c * (1 - s) + vec3(1,1,1) * s
 			--c = c / math.max(unpack(c))
 			graph.color = c
 		end
