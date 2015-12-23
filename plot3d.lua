@@ -6,6 +6,7 @@ local GLApp = require 'glapp'
 local glCallOrRun = require 'gl.call'
 local vec2 = require 'vec.vec2'
 local vec3 = require 'vec.vec3'
+local vec4 = require 'vec.vec4'
 local vec4f = require 'ffi.vec.vec4f'
 local Quat = require 'vec.quat'
 local box2 = require 'vec.box2'
@@ -338,38 +339,126 @@ local function plot3d(graphs, numRows, fontfile)
 		gl.glDisable(gl.GL_DEPTH_TEST)
 		gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
 		glCallOrRun(list)
-		gl.glEnable(gl.GL_DEPTH_TEST)
 		gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
 
-		local function drawRuler(args)
-			local ticks = args.ticks or 5
-			gl.glColor3f(1,1,1)
+		local function drawText3D(pt, text)
+			local mv = ffi.new('float[16]')
+			local proj = ffi.new('float[16]')
+			gl.glGetFloatv(gl.GL_MODELVIEW_MATRIX, mv)
+			gl.glGetFloatv(gl.GL_PROJECTION_MATRIX, proj)
+			pt = vec4(
+				mv[0] * pt[1] + mv[4] * pt[2] + mv[8] * pt[3] + mv[12],
+				mv[1] * pt[1] + mv[5] * pt[2] + mv[9] * pt[3] + mv[13],
+				mv[2] * pt[1] + mv[6] * pt[2] + mv[10] * pt[3] + mv[14],
+				mv[3] * pt[1] + mv[7] * pt[2] + mv[11] * pt[3] + mv[15])
+			pt = vec4(
+				proj[0] * pt[1] + proj[4] * pt[2] + proj[8] * pt[3] + proj[12] * pt[4],
+				proj[1] * pt[1] + proj[5] * pt[2] + proj[9] * pt[3] + proj[13] * pt[4],
+				proj[2] * pt[1] + proj[6] * pt[2] + proj[10] * pt[3] + proj[14] * pt[4],
+				proj[3] * pt[1] + proj[7] * pt[2] + proj[11] * pt[3] + proj[15] * pt[4])
+			pt = vec3(pt[1], pt[2], pt[3]) / pt[4]
+			for i=1,3 do
+				if pt[i] < -1 or pt[i] > 1 then return end
+			end
+			pt = (pt * .5 + vec3(.5, .5, .5))
+			local w,h = gui:sysSize()
+			pt[1] = pt[1] * w
+			pt[2] = pt[2] * h
+			gl.glMatrixMode(gl.GL_PROJECTION)
+			gl.glPushMatrix()
+			gl.glLoadIdentity()
+			gl.glOrtho(0, w, 0, h, -1, 1) 
+			gl.glMatrixMode(gl.GL_MODELVIEW)
+			gl.glPushMatrix()
+			gl.glLoadIdentity()
+			gui.font:draw{
+				pos = pt,
+				fontSize = {1,-1},
+				text = text,
+				size = {w,h},
+			}
+			gl.glMatrixMode(gl.GL_PROJECTION)
+			gl.glPopMatrix()
+			gl.glMatrixMode(gl.GL_MODELVIEW)
+			gl.glPopMatrix()
+		end
+
+		local function drawLine(args)
 			gl.glBegin(gl.GL_LINES)
 			gl.glVertex3f(unpack(args.p1))
 			gl.glVertex3f(unpack(args.p2))
+			gl.glEnd()
+		end
+		
+		local function drawTicks(args)
+			local ticks = args.ticks or 8
+			gl.glColor3f(1,1,1)
 			local d = args.p2 - args.p1
 			for i=0,ticks do
-				gl.glVertex3f(unpack(args.p1 + d*(i/ticks) + args.perp*.1))
-				gl.glVertex3f(unpack(args.p1 + d*(i/ticks) - args.perp*.1))
+				local center = args.p1 + d*(i/ticks)
+				gl.glBegin(gl.GL_LINES)
+				gl.glVertex3f(unpack(center + args.perp*.1))
+				gl.glVertex3f(unpack(center - args.perp*.1))
+				gl.glEnd()
+
+				local v = (args.to - args.from) * i/ticks + args.from
+				drawText3D(args.perp*.1 + center, tostring(v))
 			end
-			gl.glEnd()
 		end
 		
 		-- project view -z
 		local right = viewRot:conjugate():xAxis()
 		local fwd = -viewRot:conjugate():zAxis()
 
-		-- draw a box around it
-		-- draw tickers along each axis at specific spacing ... 5 tics per axii? 
-		local v = vec3()
-		v[1] = (right[1] < 0) and -1 or 1
-		v[2] = (right[2] < 0) and -1 or 1
-		v[3] = -1
-		drawRuler{
-			p1=vec3(v[1], v[2], v[3]),
-			p2=vec3(v[1], v[2], -v[3]),
-			perp=fwd:cross(vec3(0,0,1)),
-		}
+		for _,graph in pairs(graphs) do
+			local cols = graph.cols
+			
+			-- draw a box around it
+			-- draw tickers along each axis at specific spacing ... 5 tics per axii? 
+			local v = vec3()
+			v[1] = (right[1] < 0) and -1 or 1
+			v[2] = (right[2] < 0) and -1 or 1
+			v[3] = -1
+
+			for j=1,3 do
+				local from = graph.mins[cols[j]]
+				local to = graph.maxs[cols[j]]
+				if v[j] > 0 then from,to = to,from end
+				local fromPt = vec3(unpack(v))
+				local toPt = vec3(unpack(v))
+				toPt[j] = -toPt[j]
+				local axis = vec3(0,0,0)
+				axis[j] = 1
+				drawTicks{
+					p1=fromPt,
+					p2=toPt,
+					perp=fwd:cross(axis),
+					from=from,
+					to=to,
+				}
+			end
+			
+			local bottomVtxs = {
+				vec3(-1,-1,-1),
+				vec3(1,-1,-1),
+				vec3(1,1,-1),
+				vec3(-1,1,-1),
+			}
+			for i=1,4 do
+				-- TODO only draw if not in the front
+				drawLine{
+					p1=bottomVtxs[i],
+					p2=bottomVtxs[i%4+1],
+				}
+				drawLine{
+					p1=bottomVtxs[i],
+					p2=bottomVtxs[i]+vec3(0,0,2),
+				}
+			end
+
+		end
+		
+		gl.glEnable(gl.GL_DEPTH_TEST)
 
 		gui:update()
 	end
