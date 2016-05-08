@@ -23,6 +23,10 @@ while true do
 		files:last().title = getarg()
 	elseif arg == 'color' then
 		files:last().color = getarg():split',':map(function(x) return tonumber(x) end)
+	elseif arg == 'spacing' then
+		files:last().spacing = getarg():split',':map(function(x) return tonumber(x) end)
+	elseif arg == 'range' then
+				
 	else
 		files:insert{name=arg}
 	end
@@ -32,7 +36,7 @@ local dataForFile = {}
 local graphs = table()
 for _,fileInfo in ipairs(files) do
 	local fn = fileInfo.name
-	if not io.fileexists(fn) then
+	if fn ~= '-' and not io.fileexists(fn) then
 		io.stderr:write('file '..tostring(fn)..' does not exist\n')
 		io.stderr:flush()
 	else
@@ -43,7 +47,7 @@ for _,fileInfo in ipairs(files) do
 			local eols = {}
 			
 			local j = 1
-			for l in io.lines(fn) do
+			for l in io.lines(fn ~= '-' and fn or nil) do
 				if l:sub(1,1) ~= '#' then	-- skip comments
 					local ws = l:trim():split('%s+')
 					if #ws == 1 and ws[1] == '' then

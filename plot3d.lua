@@ -262,11 +262,12 @@ local function plot3d(graphs, numRows, fontfile)
 
 		gl.glEnable(gl.GL_LIGHTING)
 		
+		gl.glDisable(gl.GL_DEPTH_TEST)
 		glCallOrRun(list, function()
 			for _,graph in pairs(graphs) do
 				local cols = graph.cols
 				if graph.enabled then
-					gl.glColor4f(graph.color[1], graph.color[2], graph.color[3], .5)
+					gl.glColor4f(graph.color[1], graph.color[2], graph.color[3], .8)
 					if graph.eols then
 						--[[ line
 						for ei=1,#graph.eols do
@@ -355,7 +356,7 @@ local function plot3d(graphs, numRows, fontfile)
 
 		gl.glDisable(gl.GL_DEPTH_TEST)
 		gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
-		glCallOrRun(list)
+		--glCallOrRun(list)
 		gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
 
 		local function drawText3D(pt, text)
