@@ -187,18 +187,18 @@ local function plot3d(graphs, numRows, fontfile)
 		
 		gl.glEnable(gl.GL_NORMALIZE)
 
-		gl.glLightModelfv(gl.GL_LIGHT_MODEL_AMBIENT, vec4f(0,0,0,0):ptr())
+		gl.glLightModelfv(gl.GL_LIGHT_MODEL_AMBIENT, vec4f(0,0,0,0).s)
 		gl.glLightModelf(gl.GL_LIGHT_MODEL_LOCAL_VIEWER, gl.GL_TRUE)
 		gl.glLightModelf(gl.GL_LIGHT_MODEL_TWO_SIDE, gl.GL_TRUE)
 		gl.glLightModelf(gl.GL_LIGHT_MODEL_COLOR_CONTROL, gl.GL_SEPARATE_SPECULAR_COLOR)
 
 		gl.glMaterialf(gl.GL_FRONT_AND_BACK, gl.GL_SHININESS, 127)
-		gl.glMaterialfv(gl.GL_FRONT_AND_BACK, gl.GL_SPECULAR, vec4f(1,1,1,1):ptr())
+		gl.glMaterialfv(gl.GL_FRONT_AND_BACK, gl.GL_SPECULAR, vec4f(1,1,1,1).s)
 		gl.glColorMaterial(gl.GL_FRONT_AND_BACK, gl.GL_DIFFUSE)
 		gl.glEnable(gl.GL_COLOR_MATERIAL)
 
-		gl.glLightfv(gl.GL_LIGHT0, gl.GL_SPECULAR, vec4f(1,1,1,1):ptr())
-		gl.glLightfv(gl.GL_LIGHT0, gl.GL_POSITION, vec4f(0,0,0,1):ptr())
+		gl.glLightfv(gl.GL_LIGHT0, gl.GL_SPECULAR, vec4f(1,1,1,1).s)
+		gl.glLightfv(gl.GL_LIGHT0, gl.GL_POSITION, vec4f(0,0,0,1).s)
 		gl.glEnable(gl.GL_LIGHT0)
 	end
 		
