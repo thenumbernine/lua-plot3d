@@ -121,7 +121,7 @@ local function plot3d(graphs, numRows, fontfile)
 
 	local Plot3DApp = class(GLApp)
 	function Plot3DApp:initGL(gl,glname)
-		if not fontfile or not io.fileexists(fontfile) then
+		if not fontfile or not os.fileexists(fontfile) then
 			local home = os.getenv'HOME'
 			fontfile = home..'/Projects/lua/plot3d/font.png'
 		end
