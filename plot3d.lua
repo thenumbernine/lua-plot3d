@@ -77,10 +77,10 @@ local function plot3d(graphs, numRows, fontfile)
 				end
 			end
 		end
-	
+
 		print('mins', unpack(graph.mins))
 		print('maxs', unpack(graph.maxs))
-	
+
 		graph.length = length
 	end
 
@@ -100,14 +100,14 @@ local function plot3d(graphs, numRows, fontfile)
 	end
 
 	resetView = function()
-	
+
 		-- TODO calculate all points and determine the best distance to view them at
 		mins = {}
 		maxs = {}
 		for _,graph in pairs(graphs) do
 			if graph.enabled then
 				local cols = graph.cols
-				for i=1,3 do 
+				for i=1,3 do
 					mins[i] = math.min(mins[i] or graph.mins[cols[i]], graph.mins[cols[i]])
 					maxs[i] = math.max(maxs[i] or graph.maxs[cols[i]], graph.maxs[cols[i]])
 				end
@@ -116,24 +116,23 @@ local function plot3d(graphs, numRows, fontfile)
 		if #mins == 0 then mins = {-1,-1,-1} end
 		if #maxs == 0 then maxs = {1,1,1} end
 	end
-	
+
 	resetView()
 
 	local Plot3DApp = class(GLApp)
 	function Plot3DApp:initGL(gl,glname)
 		if not fontfile or not os.fileexists(fontfile) then
-			local home = os.getenv'HOME'
-			fontfile = home..'/Projects/lua/plot3d/font.png'
+			fontfile = os.getenv'LUA_PROJECT_PATH'..'/plot3d/font.png'
 		end
-	
+
 		gui = GUI{font=fontfile}
-		
+
 		local names = table()
 		for name,_ in pairs(graphs) do
 			names:insert(name)
 		end
 		names:sort()
-		
+
 		local function colorForEnabled(graph)
 			if graph.enabled then
 				return graph.color[1], graph.color[2], graph.color[3], 1
@@ -141,9 +140,9 @@ local function plot3d(graphs, numRows, fontfile)
 				return .4, .4, .4, 1
 			end
 		end
-		
+
 		local Text = require 'gui.widget.text'
-		
+
 		coordText = gui:widget{
 			class=Text,
 			text='',
@@ -151,7 +150,7 @@ local function plot3d(graphs, numRows, fontfile)
 			pos={0,0},
 			fontSize={2,2}
 		}
-		
+
 		local y = 1
 		local x = 1
 		for i,name in ipairs(names) do
@@ -173,18 +172,18 @@ local function plot3d(graphs, numRows, fontfile)
 				end,
 			}
 			y=y+2
-			
+
 			if numRows and i % numRows == 0 then
 				y = 1
 				x = x + 10
 			end
 		end
-		
+
 		gl.glClearColor(0,0,0,0)
 		--gl.glEnable(gl.GL_DEPTH_TEST)
 		gl.glEnable(gl.GL_BLEND)
 		gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
-		
+
 		gl.glEnable(gl.GL_NORMALIZE)
 
 		gl.glLightModelfv(gl.GL_LIGHT_MODEL_AMBIENT, vec4f(0,0,0,0).s)
@@ -201,7 +200,7 @@ local function plot3d(graphs, numRows, fontfile)
 		gl.glLightfv(gl.GL_LIGHT0, gl.GL_POSITION, vec4f(0,0,0,1).s)
 		gl.glEnable(gl.GL_LIGHT0)
 	end
-		
+
 	function Plot3DApp:event(event)
 		if event.type == sdl.SDL_MOUSEMOTION then
 			if leftButtonDown then
@@ -227,7 +226,7 @@ local function plot3d(graphs, numRows, fontfile)
 			end
 		end
 	end
-		
+
 	function Plot3DApp:update()
 		gl.glClear(bit.bor(gl.GL_COLOR_BUFFER_BIT, gl.GL_DEPTH_BUFFER_BIT))
 
@@ -241,16 +240,16 @@ local function plot3d(graphs, numRows, fontfile)
 		gl.glLoadIdentity()
 
 		gl.glTranslated(0,0,-viewDist)
-		
+
 		local aa = viewRot:toAngleAxis()
 		gl.glRotated(aa[4], aa[1], aa[2], aa[3])
 
 		-- position view in center of data
 		--gl.glTranslated( -(maxs[1] + mins[1])/2, -(maxs[2] + mins[2])/2, 0)
-		
+
 		gl.glColor3d(1,1,1)
-		
-		
+
+
 		--[[
 		local mx, my = gui:sysSize()
 		coordText:pos(mousepos[1] * mx, mousepos[2] * my)
@@ -261,7 +260,7 @@ local function plot3d(graphs, numRows, fontfile)
 		--]]
 
 		gl.glEnable(gl.GL_LIGHTING)
-		
+
 		gl.glDisable(gl.GL_DEPTH_TEST)
 		glCallOrRun(list, function()
 			for _,graph in pairs(graphs) do
@@ -279,7 +278,7 @@ local function plot3d(graphs, numRows, fontfile)
 							end
 							gl.glEnd()
 						end
-						
+
 						local ofs = 0
 						local done = false
 						repeat
@@ -323,7 +322,7 @@ local function plot3d(graphs, numRows, fontfile)
 								for j,i in ipairs(indexes) do
 									for k=1,3 do
 										local x = graph[cols[k]][i]
-										bad = bad or not math.isfinite(x) 
+										bad = bad or not math.isfinite(x)
 										x = (x - mins[k]) / (maxs[k] - mins[k]) * 2 - 1
 										qvtx[j][k] = x
 									end
@@ -385,7 +384,7 @@ local function plot3d(graphs, numRows, fontfile)
 			gl.glMatrixMode(gl.GL_PROJECTION)
 			gl.glPushMatrix()
 			gl.glLoadIdentity()
-			gl.glOrtho(0, w, 0, h, -1, 1) 
+			gl.glOrtho(0, w, 0, h, -1, 1)
 			gl.glMatrixMode(gl.GL_MODELVIEW)
 			gl.glPushMatrix()
 			gl.glLoadIdentity()
@@ -407,7 +406,7 @@ local function plot3d(graphs, numRows, fontfile)
 			gl.glVertex3f(unpack(args.p2))
 			gl.glEnd()
 		end
-		
+
 		local function drawTicks(args)
 			local ticks = args.ticks or 8
 			gl.glColor3f(1,1,1)
@@ -423,13 +422,13 @@ local function plot3d(graphs, numRows, fontfile)
 				drawText3D(args.perp*.1 + center, tostring(v))
 			end
 		end
-		
+
 		-- project view -z
 		local right = viewRot:conjugate():xAxis()
 		local fwd = -viewRot:conjugate():zAxis()
 
 		-- draw a box around it
-		-- draw tickers along each axis at specific spacing ... 5 tics per axii? 
+		-- draw tickers along each axis at specific spacing ... 5 tics per axii?
 		local v = vec3()
 		v[1] = (right[1] < 0) and -1 or 1
 		v[2] = (right[2] < 0) and -1 or 1
@@ -452,7 +451,7 @@ local function plot3d(graphs, numRows, fontfile)
 				to=to,
 			}
 		end
-		
+
 		local bottomVtxs = {
 			vec3(-1,-1,-1),
 			vec3(1,-1,-1),
@@ -470,7 +469,7 @@ local function plot3d(graphs, numRows, fontfile)
 				p2=bottomVtxs[i]+vec3(0,0,2),
 			}
 		end
-		
+
 		gl.glEnable(gl.GL_DEPTH_TEST)
 
 		gui:update()
