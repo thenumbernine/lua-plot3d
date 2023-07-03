@@ -475,7 +475,7 @@ local function plot3d(graphs, numRows, fontfile)
 		gui:update()
 	end
 	local plot3dapp = Plot3DApp()
-	plot3dapp:run()
+	return plot3dapp:run()
 end
 
 return plot3d

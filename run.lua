@@ -93,4 +93,4 @@ for _,fileInfo in ipairs(files) do
 end
 
 local plot3d = require 'plot3d'
-plot3d(graphs)
+return plot3d(graphs)
