@@ -36,7 +36,7 @@ local dataForFile = {}
 local graphs = table()
 for _,fileInfo in ipairs(files) do
 	local fn = fileInfo.name
-	if fn ~= '-' and not io.fileexists(fn) then
+	if fn ~= '-' and not os.fileexists(fn) then
 		io.stderr:write('file '..tostring(fn)..' does not exist\n')
 		io.stderr:flush()
 	else

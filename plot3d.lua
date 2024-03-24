@@ -1,6 +1,5 @@
 local ffi = require 'ffi'
 local gl = require 'gl'
-local glu = require 'ffi.req' 'glu'
 local sdl = require 'ffi.req' 'sdl'
 local GLApp = require 'glapp'
 local glCallOrRun = require 'gl.call'
