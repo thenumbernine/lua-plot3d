@@ -214,10 +214,10 @@ local function plot3d(graphs, numRows, fontfile)
 		elseif event.type == sdl.SDL_MOUSEBUTTONDOWN then
 			if event.button.button == sdl.SDL_BUTTON_LEFT then
 				leftButtonDown = true
-			elseif event.button.button == sdl.SDL_BUTTON_WHEELUP then
-				viewDist = viewDist - .5
-			elseif event.button.button == sdl.SDL_BUTTON_WHEELDOWN then
-				viewDist = viewDist + .5
+			--elseif event.button.button == sdl.SDL_BUTTON_WHEELUP then
+			--	viewDist = viewDist - .5
+			--elseif event.button.button == sdl.SDL_BUTTON_WHEELDOWN then
+			--	viewDist = viewDist + .5
 			end
 		elseif event.type == sdl.SDL_MOUSEBUTTONUP then
 			if event.button.button == sdl.SDL_BUTTON_LEFT then
