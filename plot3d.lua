@@ -119,7 +119,7 @@ local function plot3d(graphs, numRows, fontfile)
 	resetView()
 
 	local Plot3DApp = class(GLApp)
-	function Plot3DApp:initGL(gl,glname)
+	function Plot3DApp:initGL()
 		if not fontfile or not os.fileexists(fontfile) then
 			fontfile = os.getenv'LUA_PROJECT_PATH'..'/plot3d/font.png'
 		end
@@ -201,26 +201,26 @@ local function plot3d(graphs, numRows, fontfile)
 	end
 
 	function Plot3DApp:event(event)
-		if event.type == sdl.SDL_MOUSEMOTION then
+		if event[0].type == sdl.SDL_MOUSEMOTION then
 			if leftButtonDown then
-				local idx = tonumber(event.motion.xrel)
-				local idy = tonumber(event.motion.yrel)
+				local idx = tonumber(event[0].motion.xrel)
+				local idy = tonumber(event[0].motion.yrel)
 				local magn = math.sqrt(idx * idx + idy * idy)
 				local dx = idx / magn
 				local dy = idy / magn
 				local r = Quat():fromAngleAxis(dy, dx, 0, magn)
 				viewRot = (r * viewRot):normalize()
 			end
-		elseif event.type == sdl.SDL_MOUSEBUTTONDOWN then
-			if event.button.button == sdl.SDL_BUTTON_LEFT then
+		elseif event[0].type == sdl.SDL_MOUSEBUTTONDOWN then
+			if event[0].button.button == sdl.SDL_BUTTON_LEFT then
 				leftButtonDown = true
-			--elseif event.button.button == sdl.SDL_BUTTON_WHEELUP then
+			--elseif event[0].button.button == sdl.SDL_BUTTON_WHEELUP then
 			--	viewDist = viewDist - .5
-			--elseif event.button.button == sdl.SDL_BUTTON_WHEELDOWN then
+			--elseif event[0].button.button == sdl.SDL_BUTTON_WHEELDOWN then
 			--	viewDist = viewDist + .5
 			end
-		elseif event.type == sdl.SDL_MOUSEBUTTONUP then
-			if event.button.button == sdl.SDL_BUTTON_LEFT then
+		elseif event[0].type == sdl.SDL_MOUSEBUTTONUP then
+			if event[0].button.button == sdl.SDL_BUTTON_LEFT then
 				leftButtonDown = false
 			end
 		end
