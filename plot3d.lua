@@ -118,7 +118,8 @@ local function plot3d(graphs, numRows, fontfile)
 
 	resetView()
 
-	local Plot3DApp = class(GLApp)
+	local Plot3DApp = GLApp:subclass()
+	Plot3DApp.viewUseGLMatrixMode = true 
 	function Plot3DApp:initGL()
 		if not fontfile or not os.fileexists(fontfile) then
 			fontfile = os.getenv'LUA_PROJECT_PATH'..'/plot3d/font.png'
