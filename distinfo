@@ -1,0 +1,16 @@
+name = "plot3d"
+files = {
+	["font.png"] = "plot3d/font.png",
+	["plot3d-dev-1.rockspec"] = "plot3d/plot3d-dev-1.rockspec",
+	["plot3d.lua"] = "plot3d/plot3d.lua",
+	["run.lua"] = "plot3d/run.lua",
+}
+deps = {
+	"ext",
+	"gl",
+	"glapp",
+	"gui",
+	"sdl",
+	"vec",
+	"vec-ffi",
+}
