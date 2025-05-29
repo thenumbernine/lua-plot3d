@@ -202,7 +202,7 @@ local function plot3d(graphs, numRows, fontfile)
 	end
 
 	function Plot3DApp:event(event)
-		if event[0].type == sdl.SDL_MOUSEMOTION then
+		if event[0].type == sdl.SDL_EVENT_MOUSE_MOTION then
 			if leftButtonDown then
 				local idx = tonumber(event[0].motion.xrel)
 				local idy = tonumber(event[0].motion.yrel)
@@ -212,7 +212,7 @@ local function plot3d(graphs, numRows, fontfile)
 				local r = Quat():fromAngleAxis(dy, dx, 0, magn)
 				viewRot = (r * viewRot):normalize()
 			end
-		elseif event[0].type == sdl.SDL_MOUSEBUTTONDOWN then
+		elseif event[0].type == sdl.SDL_EVENT_MOUSE_BUTTON_DOWN then
 			if event[0].button.button == sdl.SDL_BUTTON_LEFT then
 				leftButtonDown = true
 			--elseif event[0].button.button == sdl.SDL_BUTTON_WHEELUP then
@@ -220,7 +220,7 @@ local function plot3d(graphs, numRows, fontfile)
 			--elseif event[0].button.button == sdl.SDL_BUTTON_WHEELDOWN then
 			--	viewDist = viewDist + .5
 			end
-		elseif event[0].type == sdl.SDL_MOUSEBUTTONUP then
+		elseif event[0].type == sdl.SDL_EVENT_MOUSE_BUTTON_UP then
 			if event[0].button.button == sdl.SDL_BUTTON_LEFT then
 				leftButtonDown = false
 			end
