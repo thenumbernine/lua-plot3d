@@ -25,6 +25,10 @@ while true do
 		files:last().color = getarg():split',':map(function(x) return tonumber(x) end)
 	elseif arg == 'spacing' then
 		files:last().spacing = getarg():split',':map(function(x) return tonumber(x) end)
+	elseif arg == 'mins' then
+		files:last().mins = getarg():split',':map(function(x) return tonumber(x) end)
+	elseif arg == 'maxs' then
+		files:last().maxs = getarg():split',':map(function(x) return tonumber(x) end)
 	elseif arg == 'range' then
 				
 	else
@@ -89,6 +93,8 @@ for _,fileInfo in ipairs(files) do
 		graphs[title].enabled = true
 		graphs[title].cols = fileInfo.cols
 		graphs[title].color = fileInfo.color
+		graphs[title].mins = fileInfo.mins
+		graphs[title].maxs = fileInfo.maxs
 	end
 end
 

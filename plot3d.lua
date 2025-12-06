@@ -60,19 +60,15 @@ local function plot3d(graphs, numRows, fontfile)
 		if not graph.cols then
 			graph.cols = {1,2,3}
 		end
-		local length
-		graph.mins = {}
-		graph.maxs = {}
-		for i,data in ipairs(graph) do
-			if not length then
-				length = #data
-			else
-				assert(#data == length, "data mismatched length, found "..#data.." expected "..length)
-			end
-			for _,value in ipairs(data) do
-				if math.isfinite(value) then
-					if not graph.mins[i] then graph.mins[i] = value else graph.mins[i] = math.min(graph.mins[i], value) end
-					if not graph.maxs[i] then graph.maxs[i] = value else graph.maxs[i] = math.max(graph.maxs[i], value) end
+		if not graph.mins or not graph.maxs then
+			graph.mins = {}
+			graph.maxs = {}
+			for i,data in ipairs(graph) do
+				for _,value in ipairs(data) do
+					if math.isfinite(value) then
+						if not graph.mins[i] then graph.mins[i] = value else graph.mins[i] = math.min(graph.mins[i], value) end
+						if not graph.maxs[i] then graph.maxs[i] = value else graph.maxs[i] = math.max(graph.maxs[i], value) end
+					end
 				end
 			end
 		end
@@ -80,6 +76,14 @@ local function plot3d(graphs, numRows, fontfile)
 		print('mins', unpack(graph.mins))
 		print('maxs', unpack(graph.maxs))
 
+		local length
+		for i,data in ipairs(graph) do
+			if not length then
+				length = #data
+			else
+				assert(#data == length, "data mismatched length, found "..#data.." expected "..length)
+			end
+		end
 		graph.length = length
 	end
 
@@ -215,11 +219,9 @@ local function plot3d(graphs, numRows, fontfile)
 		elseif event[0].type == sdl.SDL_EVENT_MOUSE_BUTTON_DOWN then
 			if event[0].button.button == sdl.SDL_BUTTON_LEFT then
 				leftButtonDown = true
-			--elseif event[0].button.button == sdl.SDL_BUTTON_WHEELUP then
-			--	viewDist = viewDist - .5
-			--elseif event[0].button.button == sdl.SDL_BUTTON_WHEELDOWN then
-			--	viewDist = viewDist + .5
 			end
+		elseif event[0].type == sdl.SDL_EVENT_MOUSE_WHEEL then
+			viewDist = viewDist - .5 * event[0].wheel.y
 		elseif event[0].type == sdl.SDL_EVENT_MOUSE_BUTTON_UP then
 			if event[0].button.button == sdl.SDL_BUTTON_LEFT then
 				leftButtonDown = false
