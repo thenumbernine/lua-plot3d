@@ -1,25 +1,19 @@
 local ffi = require 'ffi'
-local gl = require 'gl'
-local sdl = require 'sdl'
-local GLApp = require 'glapp'
-local glCallOrRun = require 'gl.call'
+local path = require 'ext.path'
 local vec2 = require 'vec.vec2'
 local vec3 = require 'vec.vec3'
 local vec4 = require 'vec.vec4'
+local vec3d = require 'vec-ffi.vec3d'
 local vec4f = require 'vec-ffi.vec4f'
-local Quat = require 'vec.quat'
 local box2 = require 'vec.box2'
+local gl = require 'gl'
+local sdl = require 'sdl'
+local glCallOrRun = require 'gl.call'
 local GUI = require 'gui'
 
 local resetView
 
-local viewRot = Quat(math.sqrt(.5),0,0,-math.sqrt(.5))
 local leftButtonDown
-local viewDist = 5
-local zNear = 1
-local zFar = 1000
-local tanFovX = .5
-local tanFovY = .5
 
 local quad = {{0,0}, {1,0}, {1,1}, {0,1}}
 
@@ -34,7 +28,6 @@ graphs = {
 	}
 --]]
 local function plot3d(graphs, numRows, fontfile)
-
 	local colors = {
 		vec3(1,0,0),
 		vec3(1,1,0),
@@ -122,10 +115,17 @@ local function plot3d(graphs, numRows, fontfile)
 
 	resetView()
 
-	local Plot3DApp = GLApp:subclass()
-	Plot3DApp.viewUseGLMatrixMode = true 
-	function Plot3DApp:initGL()
-		if not fontfile or not os.fileexists(fontfile) then
+	local Plot3DApp = require 'glapp.orbit'()
+
+	Plot3DApp.viewDist = 3
+	Plot3DApp.viewUseGLMatrixMode = true
+
+	function Plot3DApp:initGL(...)
+		if Plot3DApp.super.initGL then
+			Plot3DApp.super.initGL(self, ...)
+		end
+		if not fontfile or not path(fontfile):exists() then
+			-- TODO resolve path to `require 'gui'`
 			fontfile = os.getenv'LUA_PROJECT_PATH'..'/plot3d/font.png'
 		end
 
@@ -205,52 +205,11 @@ local function plot3d(graphs, numRows, fontfile)
 		gl.glEnable(gl.GL_LIGHT0)
 	end
 
-	function Plot3DApp:event(event)
-		if event[0].type == sdl.SDL_EVENT_MOUSE_MOTION then
-			if leftButtonDown then
-				local idx = tonumber(event[0].motion.xrel)
-				local idy = tonumber(event[0].motion.yrel)
-				local magn = math.sqrt(idx * idx + idy * idy)
-				local dx = idx / magn
-				local dy = idy / magn
-				local r = Quat():fromAngleAxis(dy, dx, 0, magn)
-				viewRot = (r * viewRot):normalize()
-			end
-		elseif event[0].type == sdl.SDL_EVENT_MOUSE_BUTTON_DOWN then
-			if event[0].button.button == sdl.SDL_BUTTON_LEFT then
-				leftButtonDown = true
-			end
-		elseif event[0].type == sdl.SDL_EVENT_MOUSE_WHEEL then
-			viewDist = viewDist - .5 * event[0].wheel.y
-		elseif event[0].type == sdl.SDL_EVENT_MOUSE_BUTTON_UP then
-			if event[0].button.button == sdl.SDL_BUTTON_LEFT then
-				leftButtonDown = false
-			end
-		end
-	end
-
 	function Plot3DApp:update()
 		gl.glClear(bit.bor(gl.GL_COLOR_BUFFER_BIT, gl.GL_DEPTH_BUFFER_BIT))
-
-		local viewWidth, viewHeight = self:size()
-		local aspectRatio = viewWidth / viewHeight
-		gl.glMatrixMode(gl.GL_PROJECTION)
-		gl.glLoadIdentity()
-		gl.glFrustum(-zNear * aspectRatio * tanFovX, zNear * aspectRatio * tanFovX, -zNear * tanFovY, zNear * tanFovY, zNear, zFar);
-
-		gl.glMatrixMode(gl.GL_MODELVIEW)
-		gl.glLoadIdentity()
-
-		gl.glTranslated(0,0,-viewDist)
-
-		local aa = viewRot:toAngleAxis()
-		gl.glRotated(aa[4], aa[1], aa[2], aa[3])
-
-		-- position view in center of data
-		--gl.glTranslated( -(maxs[1] + mins[1])/2, -(maxs[2] + mins[2])/2, 0)
+		Plot3DApp.super.update(self)	-- update view
 
 		gl.glColor3d(1,1,1)
-
 
 		--[[
 		local mx, my = gui:sysSize()
@@ -426,29 +385,30 @@ local function plot3d(graphs, numRows, fontfile)
 		end
 
 		-- project view -z
-		local right = viewRot:conjugate():xAxis()
-		local fwd = -viewRot:conjugate():zAxis()
+		local viewRot = self.view.angle
+		local right = viewRot:xAxis()
+		local fwd = -viewRot:zAxis()
 
 		-- draw a box around it
 		-- draw tickers along each axis at specific spacing ... 5 tics per axii?
-		local v = vec3()
-		v[1] = (right[1] < 0) and -1 or 1
-		v[2] = (right[2] < 0) and -1 or 1
-		v[3] = -1
+		local v = vec3d()
+		v.x = (right.x < 0) and -1 or 1
+		v.y = (right.y < 0) and -1 or 1
+		v.z = -1
 
-		for j=1,3 do
-			local from = mins[j]
-			local to = maxs[j]
-			if v[j] > 0 then from,to = to,from end
-			local fromPt = vec3(unpack(v))
-			local toPt = vec3(unpack(v))
-			toPt[j] = -toPt[j]
-			local axis = vec3(0,0,0)
-			axis[j] = 1
+		for j=0,2 do
+			local from = mins[j+1]
+			local to = maxs[j+1]
+			if v.s[j] > 0 then from,to = to,from end
+			local fromPt = v:clone()
+			local toPt = v:clone()
+			toPt.s[j] = -toPt.s[j]
+			local axis = vec3d()
+			axis.s[j] = 1
 			drawTicks{
-				p1=fromPt,
-				p2=toPt,
-				perp=fwd:cross(axis),
+				p1=vec3(fromPt:unpack()),
+				p2=vec3(toPt:unpack()),
+				perp=vec3(fwd:cross(axis):unpack()),
 				from=from,
 				to=to,
 			}
