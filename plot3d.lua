@@ -307,53 +307,7 @@ void main() {
 						until done
 						--]]
 						-- [[ surface -- assuming consistent-sized offsets
-						local indexes = {}
-						local vecs = {}
-						local qvtx = {{}, {}, {}, {}}
-						
-						local vertexes = table()
-						local normals = table()
-						for basey=1,#graph.eols-2 do
-							for basex=1,graph.eols[1]-1 do
-								for ofsi,ofs in ipairs(quad) do
-									local x = basex + ofs[1]
-									local y = basey + ofs[2]
-									indexes[ofsi] = (graph.eols[y-1] or 0) + x
-								end
-								for i,index in ipairs(indexes) do
-									vecs[i] = vec3(graph[cols[1]][index], graph[cols[2]][index], graph[cols[3]][index])
-									-- position data in center of view
-									for j=1,3 do
-										vecs[i][j] = (vecs[i][j] - mins[j]) / (maxs[j] - mins[j]) * 2 - 1
-									end
-								end
-								local dx = (vecs[2] - vecs[1] + vecs[3] - vecs[4]) * .5
-								local dy = (vecs[4] - vecs[1] + vecs[3] - vecs[2]) * .5
-								local nx = dx[2] * dy[3] - dx[3] * dy[2]
-								local ny = dx[3] * dy[1] - dx[1] * dy[3]
-								local nz = dx[1] * dy[2] - dx[2] * dy[1]
-								local bad = false
-								for j,i in ipairs(indexes) do
-									for k=1,3 do
-										local x = graph[cols[k]][i]
-										bad = bad or not math.isfinite(x)
-										x = (x - mins[k]) / (maxs[k] - mins[k]) * 2 - 1
-										qvtx[j][k] = x
-									end
-								end
-								if not bad then
-									for j=1,4 do
-										for k=1,3 do
-											vertexes:insert(qvtx[j][k])
-										end
-										normals:insert(nx)
-										normals:insert(ny)
-										normals:insert(nz)
-									end
-								end
-							end
-						end
-print('building graph...')
+
 						graph.obj = GLSceneObject{
 							program = {
 								version = 'latest',
@@ -400,18 +354,68 @@ void main() {
 								mode = gl.GL_QUADS,
 							},
 							vertexes = {
-								data = vertexes,
+								useVec = true,
 								dim = 3,
 							},
 							attrs = {
 								normal = {
 									buffer = {
-										data = normals,
+										useVec = true,
 										dim = 3,
 									},
 								},
 							},
-						}						
+						}
+
+						local indexes = {}
+						local vecs = {}
+						local qvtx = {{}, {}, {}, {}}
+
+						local vertexes = graph.obj.attrs.vertex.buffer:beginUpdate()
+						local normals = graph.obj.attrs.normal.buffer:beginUpdate()
+
+						for basey=1,#graph.eols-2 do
+							for basex=1,graph.eols[1]-1 do
+								for ofsi,ofs in ipairs(quad) do
+									local x = basex + ofs[1]
+									local y = basey + ofs[2]
+									indexes[ofsi] = (graph.eols[y-1] or 0) + x
+								end
+								for i,index in ipairs(indexes) do
+									vecs[i] = vec3(graph[cols[1]][index], graph[cols[2]][index], graph[cols[3]][index])
+									-- position data in center of view
+									for j=1,3 do
+										vecs[i][j] = (vecs[i][j] - mins[j]) / (maxs[j] - mins[j]) * 2 - 1
+									end
+								end
+								local dx = (vecs[2] - vecs[1] + vecs[3] - vecs[4]) * .5
+								local dy = (vecs[4] - vecs[1] + vecs[3] - vecs[2]) * .5
+								local nx = dx[2] * dy[3] - dx[3] * dy[2]
+								local ny = dx[3] * dy[1] - dx[1] * dy[3]
+								local nz = dx[1] * dy[2] - dx[2] * dy[1]
+								local bad = false
+								for j,i in ipairs(indexes) do
+									for k=1,3 do
+										local x = graph[cols[k]][i]
+										bad = bad or not math.isfinite(x)
+										x = (x - mins[k]) / (maxs[k] - mins[k]) * 2 - 1
+										qvtx[j][k] = x
+									end
+								end
+								if not bad then
+									for j=1,4 do
+										vertexes:emplace_back():set(table.unpack(qvtx[j]))
+										normals:emplace_back():set(nx, ny, nz)
+									end
+								end
+							end
+						end
+
+						-- everything in graph.obj:endUpdate() except :draw()
+						graph.obj.attrs.vertex.buffer:endUpdate()
+						graph.obj.attrs.normal.buffer:endUpdate()
+						graph.obj.geometry.count = #vertexes
+
 						--]]
 					else
 						local data = table()
@@ -451,7 +455,7 @@ void main() {
 								data = data,
 								dim = 3,
 							},
-						}					
+						}
 					end
 				end
 			end
@@ -487,7 +491,7 @@ void main() {
 		local function drawLine(x1, y1, z1, x2, y2, z2)
 			local vtxs = self.lineObj:beginUpdate()
 			vtxs:resize(2)
-			local v = vtxs.v+0 
+			local v = vtxs.v+0
 			v.x, v.y, v.z = x1, y1, z1
 			local v = vtxs.v+1
 			v.x, v.y, v.z = x2, y2, z2
@@ -515,11 +519,11 @@ void main() {
 			toPt.s[j] = -toPt.s[j]
 			local axis = vec3d()
 			axis.s[j] = 1
-	
+
 			local perpX = fwd.y * axis.z - fwd.z * axis.y
 			local perpY = fwd.z * axis.x - fwd.x * axis.z
 			local perpZ = fwd.x * axis.y - fwd.y * axis.x
-		
+
 			local ticks = 8
 			for i=0,ticks do
 				local f = i / ticks
