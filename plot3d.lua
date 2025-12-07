@@ -392,22 +392,30 @@ void main() {
 								local ax = graph[colA][indexes[1]]
 								local ay = graph[colB][indexes[1]]
 								local az = graph[colC][indexes[1]]
+								if not (math.isfinite(ax) and math.isfinite(ay) and math.isfinite(az)) then goto bad end
 								ax, ay, az = scaleToMinMax(ax, ay, az)
+								qvtx[1][1], qvtx[1][2], qvtx[1][3] = ax, ay, az
 								
 								local bx = graph[colA][indexes[2]]
 								local by = graph[colB][indexes[2]]
 								local bz = graph[colC][indexes[2]]
+								if not (math.isfinite(bx) and math.isfinite(by) and math.isfinite(bz)) then goto bad end
 								bx, by, bz = scaleToMinMax(bx, by, bz)
+								qvtx[2][1], qvtx[2][2], qvtx[2][3] = bx, by, bz
 
 								local cx = graph[colA][indexes[3]]
 								local cy = graph[colB][indexes[3]]
 								local cz = graph[colC][indexes[3]]
+								if not (math.isfinite(cx) and math.isfinite(cy) and math.isfinite(cz)) then goto bad end
 								cx, cy, cz = scaleToMinMax(cx, cy, cz)
+								qvtx[3][1], qvtx[3][2], qvtx[3][3] = cx, cy, cz
 
 								local dx = graph[colA][indexes[4]]
 								local dy = graph[colB][indexes[4]]
 								local dz = graph[colC][indexes[4]]
+								if not (math.isfinite(dx) and math.isfinite(dy) and math.isfinite(dz)) then goto bad end
 								dx, dy, dz = scaleToMinMax(dx, dy, dz)
+								qvtx[4][1], qvtx[4][2], qvtx[4][3] = dx, dy, dz
 
 								local dxX = (bx - ax + cx - dx) * .5
 								local dxY = (by - ay + cy - dy) * .5
@@ -420,21 +428,11 @@ void main() {
 								local ny = dxZ * dyX - dxX * dyZ
 								local nz = dxX * dyY - dxY * dyX
 
-								local bad = false
-								for i,index in ipairs(indexes) do
-									for j=1,3 do
-										local x = graph[cols[j]][index]
-										bad = bad or not math.isfinite(x)
-										x = (x - mins[j]) / (maxs[j] - mins[j]) * 2 - 1
-										qvtx[i][j] = x
-									end
+								for i=1,4 do
+									vertexes:emplace_back():set(table.unpack(qvtx[i]))
+									normals:emplace_back():set(nx, ny, nz)
 								end
-								if not bad then
-									for i=1,4 do
-										vertexes:emplace_back():set(table.unpack(qvtx[i]))
-										normals:emplace_back():set(nx, ny, nz)
-									end
-								end
+::bad::
 							end
 						end
 
