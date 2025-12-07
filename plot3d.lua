@@ -428,10 +428,14 @@ void main() {
 								local ny = dxZ * dyX - dxX * dyZ
 								local nz = dxX * dyY - dxY * dyX
 
-								for i=1,4 do
-									vertexes:emplace_back():set(table.unpack(qvtx[i]))
-									normals:emplace_back():set(nx, ny, nz)
-								end
+								vertexes:emplace_back():set(ax, ay, az)
+								vertexes:emplace_back():set(bx, by ,bz)
+								vertexes:emplace_back():set(cx, cy, cz)
+								vertexes:emplace_back():set(dx, dy, dz)
+								normals:emplace_back():set(nx, ny, nz)
+								normals:emplace_back():set(nx, ny, nz)
+								normals:emplace_back():set(nx, ny, nz)
+								normals:emplace_back():set(nx, ny, nz)
 ::bad::
 							end
 						end
