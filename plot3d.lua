@@ -3,6 +3,7 @@ local path = require 'ext.path'
 local vec2 = require 'vec.vec2'
 local vec3 = require 'vec.vec3'
 local vec4 = require 'vec.vec4'
+local vec3f = require 'vec-ffi.vec3f'
 local vec3d = require 'vec-ffi.vec3d'
 local vec4f = require 'vec-ffi.vec4f'
 local box2 = require 'vec.box2'
@@ -13,7 +14,6 @@ local GUI = require 'gui'
 
 local resetView
 
-local leftButtonDown
 
 local quad = {{0,0}, {1,0}, {1,1}, {0,1}}
 
@@ -80,12 +80,8 @@ local function plot3d(graphs, numRows, fontfile)
 		graph.length = length
 	end
 
-	local viewpos = vec2()
-	local viewsize = vec2(1,1)
-	local leftButtonDown = false
 	local gui
 	local coordText
-	local mousepos = vec2()
 
 	local list = {}
 	local function redraw()
@@ -363,8 +359,8 @@ local function plot3d(graphs, numRows, fontfile)
 
 		local function drawLine(args)
 			gl.glBegin(gl.GL_LINES)
-			gl.glVertex3f(unpack(args.p1))
-			gl.glVertex3f(unpack(args.p2))
+			gl.glVertex3d(args.p1:unpack())
+			gl.glVertex3d(args.p2:unpack())
 			gl.glEnd()
 		end
 
@@ -415,11 +411,12 @@ local function plot3d(graphs, numRows, fontfile)
 		end
 
 		local bottomVtxs = {
-			vec3(-1,-1,-1),
-			vec3(1,-1,-1),
-			vec3(1,1,-1),
-			vec3(-1,1,-1),
+			vec3f(-1,-1,-1),
+			vec3f(1,-1,-1),
+			vec3f(1,1,-1),
+			vec3f(-1,1,-1),
 		}
+
 		for i=1,4 do
 			-- TODO only draw if not in the front
 			drawLine{
@@ -428,7 +425,7 @@ local function plot3d(graphs, numRows, fontfile)
 			}
 			drawLine{
 				p1=bottomVtxs[i],
-				p2=bottomVtxs[i]+vec3(0,0,2),
+				p2=bottomVtxs[i]+vec3f(0,0,2),
 			}
 		end
 
