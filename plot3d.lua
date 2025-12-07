@@ -6,11 +6,35 @@ local vec4 = require 'vec.vec4'
 local vec3f = require 'vec-ffi.vec3f'
 local vec3d = require 'vec-ffi.vec3d'
 local vec4f = require 'vec-ffi.vec4f'
+local vec4d = require 'vec-ffi.vec4d'
 local box2 = require 'vec.box2'
 local gl = require 'gl'
 local sdl = require 'sdl'
 local glCallOrRun = require 'gl.call'
 local GUI = require 'gui'
+
+
+local function mat4x4vecmul(m, x, y, z, w)
+	x = tonumber(x)
+	y = tonumber(y)
+	z = tonumber(z) or 0
+	w = tonumber(w) or 1
+	return
+		m[0] * x + m[4] * y + m[ 8] * z + m[12] * w,
+		m[1] * x + m[5] * y + m[ 9] * z + m[13] * w,
+		m[2] * x + m[6] * y + m[10] * z + m[14] * w,
+		m[3] * x + m[7] * y + m[11] * z + m[15] * w
+end
+
+local function homogeneous(x,y,z,w)
+	if w > 0 then
+		x = x / w
+		y = y / w
+		z = z / w
+	end
+	return x,y,z
+end
+
 
 local resetView
 
@@ -315,46 +339,44 @@ local function plot3d(graphs, numRows, fontfile)
 		--glCallOrRun(list)
 		gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
 
-		local function drawText3D(pt, text)
-			local mv = ffi.new('float[16]')
-			local proj = ffi.new('float[16]')
-			gl.glGetFloatv(gl.GL_MODELVIEW_MATRIX, mv)
-			gl.glGetFloatv(gl.GL_PROJECTION_MATRIX, proj)
-			pt = vec4(
-				mv[0] * pt[1] + mv[4] * pt[2] + mv[8] * pt[3] + mv[12],
-				mv[1] * pt[1] + mv[5] * pt[2] + mv[9] * pt[3] + mv[13],
-				mv[2] * pt[1] + mv[6] * pt[2] + mv[10] * pt[3] + mv[14],
-				mv[3] * pt[1] + mv[7] * pt[2] + mv[11] * pt[3] + mv[15])
-			pt = vec4(
-				proj[0] * pt[1] + proj[4] * pt[2] + proj[8] * pt[3] + proj[12] * pt[4],
-				proj[1] * pt[1] + proj[5] * pt[2] + proj[9] * pt[3] + proj[13] * pt[4],
-				proj[2] * pt[1] + proj[6] * pt[2] + proj[10] * pt[3] + proj[14] * pt[4],
-				proj[3] * pt[1] + proj[7] * pt[2] + proj[11] * pt[3] + proj[15] * pt[4])
-			pt = vec3(pt[1], pt[2], pt[3]) / pt[4]
-			for i=1,3 do
-				if pt[i] < -1 or pt[i] > 1 then return end
+		local drawText3D
+		do
+			local matrix = require 'matrix.ffi'
+			local mvMat = matrix({4,4}, 'float'):zeros()
+			local projMat = matrix({4,4}, 'float'):zeros()
+			function drawText3D(pt, text)
+				local mv = mvMat.ptr
+				local proj = projMat.ptr
+				gl.glGetFloatv(gl.GL_MODELVIEW_MATRIX, mv)
+				gl.glGetFloatv(gl.GL_PROJECTION_MATRIX, proj)
+				pt = vec4d(mat4x4vecmul(mv, pt:unpack()))
+				pt = vec4d(mat4x4vecmul(proj, pt:unpack()))
+				pt = vec3d(homogeneous(pt:unpack()))
+				for i=0,2 do
+					if pt.s[i] < -1 or pt.s[i] > 1 then return end
+				end
+				pt = (pt * .5 + vec3d(.5, .5, .5))
+				local w,h = gui:sysSize()
+				pt.x = pt.x * w
+				pt.y = pt.y * h
+				gl.glMatrixMode(gl.GL_PROJECTION)
+				gl.glPushMatrix()
+				gl.glLoadIdentity()
+				gl.glOrtho(0, w, 0, h, -1, 1)
+				gl.glMatrixMode(gl.GL_MODELVIEW)
+				gl.glPushMatrix()
+				gl.glLoadIdentity()
+				gui.font:draw{
+					pos = vec3(pt:unpack()),
+					fontSize = {1,-1},
+					text = text,
+					size = {w,h},
+				}
+				gl.glMatrixMode(gl.GL_PROJECTION)
+				gl.glPopMatrix()
+				gl.glMatrixMode(gl.GL_MODELVIEW)
+				gl.glPopMatrix()
 			end
-			pt = (pt * .5 + vec3(.5, .5, .5))
-			local w,h = gui:sysSize()
-			pt[1] = pt[1] * w
-			pt[2] = pt[2] * h
-			gl.glMatrixMode(gl.GL_PROJECTION)
-			gl.glPushMatrix()
-			gl.glLoadIdentity()
-			gl.glOrtho(0, w, 0, h, -1, 1)
-			gl.glMatrixMode(gl.GL_MODELVIEW)
-			gl.glPushMatrix()
-			gl.glLoadIdentity()
-			gui.font:draw{
-				pos = pt,
-				fontSize = {1,-1},
-				text = text,
-				size = {w,h},
-			}
-			gl.glMatrixMode(gl.GL_PROJECTION)
-			gl.glPopMatrix()
-			gl.glMatrixMode(gl.GL_MODELVIEW)
-			gl.glPopMatrix()
 		end
 
 		local function drawLine(args)
@@ -371,8 +393,8 @@ local function plot3d(graphs, numRows, fontfile)
 			for i=0,ticks do
 				local center = args.p1 + d*(i/ticks)
 				gl.glBegin(gl.GL_LINES)
-				gl.glVertex3f(unpack(center + args.perp*.1))
-				gl.glVertex3f(unpack(center - args.perp*.1))
+				gl.glVertex3f((center + args.perp*.1):unpack())
+				gl.glVertex3f((center - args.perp*.1):unpack())
 				gl.glEnd()
 
 				local v = (args.to - args.from) * i/ticks + args.from
@@ -402,9 +424,9 @@ local function plot3d(graphs, numRows, fontfile)
 			local axis = vec3d()
 			axis.s[j] = 1
 			drawTicks{
-				p1=vec3(fromPt:unpack()),
-				p2=vec3(toPt:unpack()),
-				perp=vec3(fwd:cross(axis):unpack()),
+				p1=fromPt,
+				p2=toPt,
+				perp=fwd:cross(axis),
 				from=from,
 				to=to,
 			}
