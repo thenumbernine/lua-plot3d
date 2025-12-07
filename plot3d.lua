@@ -2,16 +2,18 @@ local ffi = require 'ffi'
 local path = require 'ext.path'
 local vec2 = require 'vec.vec2'
 local vec3 = require 'vec.vec3'
-local vec4 = require 'vec.vec4'
 local vec3f = require 'vec-ffi.vec3f'
 local vec3d = require 'vec-ffi.vec3d'
-local vec4f = require 'vec-ffi.vec4f'
 local vec4d = require 'vec-ffi.vec4d'
+local matrix = require 'matrix.ffi'
 local box2 = require 'vec.box2'
 local gl = require 'gl'
 local glCallOrRun = require 'gl.call'
 local GLSceneObject = require 'gl.sceneobject'
 local GUI = require 'gui'
+
+GUI.drawImmediateMode = false
+require 'gui.font'.drawImmediateMode = false
 
 
 local function mat4x4vecmul(m, x, y, z, w)
@@ -36,8 +38,6 @@ local function homogeneous(x,y,z,w)
 end
 
 
-local resetView
-
 
 local quad = {{0,0}, {1,0}, {1,1}, {0,1}}
 
@@ -51,16 +51,15 @@ graphs = {
 		...
 	}
 --]]
+local colors = {
+	vec3d(1,0,0),
+	vec3d(1,1,0),
+	vec3d(0,1,0),
+	vec3d(0,1,1),
+	vec3d(.3,.3,1),
+	vec3d(1,.2,1),
+}
 local function plot3d(graphs, numRows, fontfile)
-	local colors = {
-		vec3(1,0,0),
-		vec3(1,1,0),
-		vec3(0,1,0),
-		vec3(0,1,1),
-		vec3(.3,.3,1),
-		vec3(1,.2,1),
-	}
-
 	for name,graph in pairs(graphs) do
 		if not graph.color then
 			local h = math.random() * #colors + 1
@@ -70,8 +69,8 @@ local function plot3d(graphs, numRows, fontfile)
 			local c = colors[hi] * f + colors[hii] * (1 - f)
 			-- add luminance
 			local s = .1
-			c = c * (1 - s) + vec3(1,1,1) * s
-			--c = c / math.max(unpack(c))
+			c = c * (1 - s) + vec3d(1,1,1) * s
+			--c = c / math.max(c:unpack())
 			graph.color = c
 		end
 		if not graph.cols then
@@ -110,11 +109,11 @@ local function plot3d(graphs, numRows, fontfile)
 	local function redraw()
 		for _,graph in pairs(graphs) do
 			--graph.obj:delete()
-			graph.obj = ni
+			graph.obj = nil
 		end
 	end
 
-	resetView = function()
+	local function resetView()
 
 		-- TODO calculate all points and determine the best distance to view them at
 		mins = {}
@@ -137,7 +136,6 @@ local function plot3d(graphs, numRows, fontfile)
 	local Plot3DApp = require 'glapp.orbit'()
 
 	Plot3DApp.viewDist = 3
-	Plot3DApp.viewUseGLMatrixMode = true
 
 	function Plot3DApp:initGL(...)
 		if Plot3DApp.super.initGL then
@@ -149,6 +147,8 @@ local function plot3d(graphs, numRows, fontfile)
 		end
 
 		gui = GUI{font=fontfile}
+		gui.view = require 'glapp.view'()
+		gui.font.view = gui.view
 
 		local names = table()
 		for name,_ in pairs(graphs) do
@@ -158,7 +158,7 @@ local function plot3d(graphs, numRows, fontfile)
 
 		local function colorForEnabled(graph)
 			if graph.enabled then
-				return graph.color[1], graph.color[2], graph.color[3], 1
+				return graph.color.x, graph.color.y, graph.color.z, 1
 			else
 				return .4, .4, .4, 1
 			end
@@ -239,17 +239,21 @@ void main() {
 		}
 	end
 
-	local matrix = require 'matrix.ffi'
-	local mvMat = matrix({4,4}, 'float'):zeros()
-	local projMat = matrix({4,4}, 'float'):zeros()
-	local mvProjMat = matrix({4,4}, 'float'):zeros()
+	local bottomVtxs = {
+		vec3f(-1,-1,-1),
+		vec3f(1,-1,-1),
+		vec3f(1,1,-1),
+		vec3f(-1,1,-1),
+	}
 	function Plot3DApp:update()
 		gl.glClear(bit.bor(gl.GL_COLOR_BUFFER_BIT, gl.GL_DEPTH_BUFFER_BIT))
 		Plot3DApp.super.update(self)	-- update view
 
-		gl.glGetFloatv(gl.GL_MODELVIEW_MATRIX, mvMat.ptr)
-		gl.glGetFloatv(gl.GL_PROJECTION_MATRIX, projMat.ptr)
-		mvProjMat:mul4x4(projMat, mvMat)
+		local mx,my = gui:sysSize()
+		gui.view.mvMat:setIdent()
+		gui.view.projMat:setOrtho(0, mx, 0, my, -1, 1)
+		gui.view.mvProjMat:copy(gui.view.projMat)
+
 
 		--[[
 		local mx, my = gui:sysSize()
@@ -265,9 +269,9 @@ void main() {
 			local cols = graph.cols
 			if graph.enabled then
 				if graph.obj then
-					graph.obj.uniforms.mvMat = mvMat.ptr
-					graph.obj.uniforms.projMat = projMat.ptr
-					graph.obj.uniforms.mvProjMat = mvProjMat.ptr
+					graph.obj.uniforms.mvMat = self.view.mvMat.ptr
+					graph.obj.uniforms.projMat = self.view.projMat.ptr
+					graph.obj.uniforms.mvProjMat = self.view.mvProjMat.ptr
 					graph.obj:draw()
 				else
 					if graph.eols then
@@ -381,7 +385,7 @@ void main() {
 }
 ]],
 								uniforms = {
-									color = {graph.color[1], graph.color[2], graph.color[3], .8},
+									color = {graph.color.x, graph.color.y, graph.color.z, .8},
 								},
 							},
 							geometry = {
@@ -429,7 +433,7 @@ void main() {
 }
 ]],
 								uniforms = {
-									color = {graph.color[1], graph.color[2], graph.color[3], .8},
+									color = {graph.color.x, graph.color.y, graph.color.z, .8},
 								},
 							},
 							geometry = {
@@ -453,7 +457,7 @@ void main() {
 		--]]
 
 		local function drawText3D(pt, text)
-			pt = vec4d(mat4x4vecmul(mvProjMat.ptr, pt:unpack()))
+			pt = vec4d(mat4x4vecmul(self.view.mvProjMat.ptr, pt:unpack()))
 			pt = vec3d(homogeneous(pt:unpack()))
 			for i=0,2 do
 				if pt.s[i] < -1 or pt.s[i] > 1 then return end
@@ -463,29 +467,16 @@ void main() {
 			pt.x = pt.x * w
 			pt.y = pt.y * h
 
-			gl.glMatrixMode(gl.GL_PROJECTION)
-			gl.glPushMatrix()
-			gl.glLoadIdentity()
-			gl.glOrtho(0, w, 0, h, -1, 1)
-			gl.glMatrixMode(gl.GL_MODELVIEW)
-			gl.glPushMatrix()
-			gl.glLoadIdentity()
-
 			gui.font:draw{
 				pos = vec3(pt:unpack()),
 				fontSize = {1,-1},
 				text = text,
 				size = {w,h},
 			}
-
-			gl.glMatrixMode(gl.GL_PROJECTION)
-			gl.glPopMatrix()
-			gl.glMatrixMode(gl.GL_MODELVIEW)
-			gl.glPopMatrix()
 		end
 
 		local function drawLine(args)
-			self.lineObj.uniforms.mvProjMat = mvProjMat.ptr
+			self.lineObj.uniforms.mvProjMat = self.view.mvProjMat.ptr
 			local vtxs = self.lineObj:beginUpdate()
 			vtxs:emplace_back():set(args.p1:unpack())
 			vtxs:emplace_back():set(args.p2:unpack())
@@ -535,13 +526,6 @@ void main() {
 				to=to,
 			}
 		end
-
-		local bottomVtxs = {
-			vec3f(-1,-1,-1),
-			vec3f(1,-1,-1),
-			vec3f(1,1,-1),
-			vec3f(-1,1,-1),
-		}
 
 		for i=1,4 do
 			-- TODO only draw if not in the front
