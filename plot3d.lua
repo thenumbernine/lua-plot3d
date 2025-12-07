@@ -1,6 +1,5 @@
 local ffi = require 'ffi'
 local path = require 'ext.path'
-local vec3 = require 'vec.vec3'
 local vec3f = require 'vec-ffi.vec3f'
 local vec3d = require 'vec-ffi.vec3d'
 local vec4d = require 'vec-ffi.vec4d'
@@ -112,8 +111,8 @@ local function plot3d(graphs, numRows, fontfile)
 		end
 	end
 
+	local mins, maxs
 	local function resetView()
-
 		-- TODO calculate all points and determine the best distance to view them at
 		mins = {}
 		maxs = {}
@@ -128,6 +127,13 @@ local function plot3d(graphs, numRows, fontfile)
 		end
 		if #mins == 0 then mins = {-1,-1,-1} end
 		if #maxs == 0 then maxs = {1,1,1} end
+	end
+
+	local function scaleToMinMax(x, y, z)
+		return
+			(x - mins[1]) / (maxs[1] - mins[1]) * 2 - 1,
+			(y - mins[2]) / (maxs[2] - mins[2]) * 2 - 1,
+			(z - mins[3]) / (maxs[3] - mins[3]) * 2 - 1
 	end
 
 	resetView()
@@ -368,12 +374,12 @@ void main() {
 						}
 
 						local indexes = {}
-						local vecs = {}
 						local qvtx = {{}, {}, {}, {}}
 
 						local vertexes = graph.obj.attrs.vertex.buffer:beginUpdate()
 						local normals = graph.obj.attrs.normal.buffer:beginUpdate()
 
+						local colA, colB, colC = table.unpack(cols)
 						for basey=1,#graph.eols-2 do
 							for basex=1,graph.eols[1]-1 do
 								for ofsi,ofs in ipairs(quad) do
@@ -381,30 +387,51 @@ void main() {
 									local y = basey + ofs[2]
 									indexes[ofsi] = (graph.eols[y-1] or 0) + x
 								end
-								for i,index in ipairs(indexes) do
-									vecs[i] = vec3(graph[cols[1]][index], graph[cols[2]][index], graph[cols[3]][index])
-									-- position data in center of view
-									for j=1,3 do
-										vecs[i][j] = (vecs[i][j] - mins[j]) / (maxs[j] - mins[j]) * 2 - 1
-									end
-								end
-								local dx = (vecs[2] - vecs[1] + vecs[3] - vecs[4]) * .5
-								local dy = (vecs[4] - vecs[1] + vecs[3] - vecs[2]) * .5
-								local nx = dx[2] * dy[3] - dx[3] * dy[2]
-								local ny = dx[3] * dy[1] - dx[1] * dy[3]
-								local nz = dx[1] * dy[2] - dx[2] * dy[1]
+
+								-- position data in center of view
+								local ax = graph[colA][indexes[1]]
+								local ay = graph[colB][indexes[1]]
+								local az = graph[colC][indexes[1]]
+								ax, ay, az = scaleToMinMax(ax, ay, az)
+								
+								local bx = graph[colA][indexes[2]]
+								local by = graph[colB][indexes[2]]
+								local bz = graph[colC][indexes[2]]
+								bx, by, bz = scaleToMinMax(bx, by, bz)
+
+								local cx = graph[colA][indexes[3]]
+								local cy = graph[colB][indexes[3]]
+								local cz = graph[colC][indexes[3]]
+								cx, cy, cz = scaleToMinMax(cx, cy, cz)
+
+								local dx = graph[colA][indexes[4]]
+								local dy = graph[colB][indexes[4]]
+								local dz = graph[colC][indexes[4]]
+								dx, dy, dz = scaleToMinMax(dx, dy, dz)
+
+								local dxX = (bx - ax + cx - dx) * .5
+								local dxY = (by - ay + cy - dy) * .5
+								local dxZ = (bz - az + cz - dz) * .5
+								local dyX = (dx - ax + cx - bx) * .5
+								local dyY = (dy - ay + cy - by) * .5
+								local dyZ = (dz - az + cz - bz) * .5
+
+								local nx = dxY * dyZ - dxZ * dyY
+								local ny = dxZ * dyX - dxX * dyZ
+								local nz = dxX * dyY - dxY * dyX
+
 								local bad = false
-								for j,i in ipairs(indexes) do
-									for k=1,3 do
-										local x = graph[cols[k]][i]
+								for i,index in ipairs(indexes) do
+									for j=1,3 do
+										local x = graph[cols[j]][index]
 										bad = bad or not math.isfinite(x)
-										x = (x - mins[k]) / (maxs[k] - mins[k]) * 2 - 1
-										qvtx[j][k] = x
+										x = (x - mins[j]) / (maxs[j] - mins[j]) * 2 - 1
+										qvtx[i][j] = x
 									end
 								end
 								if not bad then
-									for j=1,4 do
-										vertexes:emplace_back():set(table.unpack(qvtx[j]))
+									for i=1,4 do
+										vertexes:emplace_back():set(table.unpack(qvtx[i]))
 										normals:emplace_back():set(nx, ny, nz)
 									end
 								end
