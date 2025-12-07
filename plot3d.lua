@@ -107,11 +107,10 @@ local function plot3d(graphs, numRows, fontfile)
 	local gui
 	local coordText
 
-	local list = {}
 	local function redraw()
-		if list.id then
-			gl.glDeleteLists(1, list.id)
-			list.id = nil
+		for _,graph in pairs(graphs) do
+			--graph.obj:delete()
+			graph.obj = ni
 		end
 	end
 
@@ -208,23 +207,6 @@ local function plot3d(graphs, numRows, fontfile)
 		gl.glEnable(gl.GL_BLEND)
 		gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)
 
-		gl.glEnable(gl.GL_NORMALIZE)
-
-		gl.glLightModelfv(gl.GL_LIGHT_MODEL_AMBIENT, vec4f(0,0,0,0).s)
-		gl.glLightModelf(gl.GL_LIGHT_MODEL_LOCAL_VIEWER, gl.GL_TRUE)
-		gl.glLightModelf(gl.GL_LIGHT_MODEL_TWO_SIDE, gl.GL_TRUE)
-		gl.glLightModelf(gl.GL_LIGHT_MODEL_COLOR_CONTROL, gl.GL_SEPARATE_SPECULAR_COLOR)
-
-		gl.glMaterialf(gl.GL_FRONT_AND_BACK, gl.GL_SHININESS, 127)
-		gl.glMaterialfv(gl.GL_FRONT_AND_BACK, gl.GL_SPECULAR, vec4f(1,1,1,1).s)
-		gl.glColorMaterial(gl.GL_FRONT_AND_BACK, gl.GL_DIFFUSE)
-		gl.glEnable(gl.GL_COLOR_MATERIAL)
-
-		gl.glLightfv(gl.GL_LIGHT0, gl.GL_SPECULAR, vec4f(1,1,1,1).s)
-		gl.glLightfv(gl.GL_LIGHT0, gl.GL_POSITION, vec4f(0,0,0,1).s)
-		gl.glEnable(gl.GL_LIGHT0)
-	
-
 		self.lineObj = GLSceneObject{
 			program = {
 				precision = 'best',
@@ -257,11 +239,17 @@ void main() {
 		}
 	end
 
+	local matrix = require 'matrix.ffi'
+	local mvMat = matrix({4,4}, 'float'):zeros()
+	local projMat = matrix({4,4}, 'float'):zeros()
+	local mvProjMat = matrix({4,4}, 'float'):zeros()
 	function Plot3DApp:update()
 		gl.glClear(bit.bor(gl.GL_COLOR_BUFFER_BIT, gl.GL_DEPTH_BUFFER_BIT))
 		Plot3DApp.super.update(self)	-- update view
 
-		gl.glColor3d(1,1,1)
+		gl.glGetFloatv(gl.GL_MODELVIEW_MATRIX, mvMat.ptr)
+		gl.glGetFloatv(gl.GL_PROJECTION_MATRIX, projMat.ptr)
+		mvProjMat:mul4x4(projMat, mvMat)
 
 		--[[
 		local mx, my = gui:sysSize()
@@ -272,14 +260,16 @@ void main() {
 		)
 		--]]
 
-		gl.glEnable(gl.GL_LIGHTING)
-
 		gl.glDisable(gl.GL_DEPTH_TEST)
-		glCallOrRun(list, function()
-			for _,graph in pairs(graphs) do
-				local cols = graph.cols
-				if graph.enabled then
-					gl.glColor4f(graph.color[1], graph.color[2], graph.color[3], .8)
+		for _,graph in pairs(graphs) do
+			local cols = graph.cols
+			if graph.enabled then
+				if graph.obj then
+					graph.obj.uniforms.mvMat = mvMat.ptr
+					graph.obj.uniforms.projMat = projMat.ptr
+					graph.obj.uniforms.mvProjMat = mvProjMat.ptr
+					graph.obj:draw()
+				else
 					if graph.eols then
 						--[[ line
 						for ei=1,#graph.eols do
@@ -312,7 +302,9 @@ void main() {
 						local indexes = {}
 						local vecs = {}
 						local qvtx = {{}, {}, {}, {}}
-						gl.glBegin(gl.GL_QUADS)
+						
+						local vertexes = table()
+						local normals = table()
 						for basey=1,#graph.eols-2 do
 							for basex=1,graph.eols[1]-1 do
 								for ofsi,ofs in ipairs(quad) do
@@ -330,7 +322,6 @@ void main() {
 								local dx = (vecs[2] - vecs[1] + vecs[3] - vecs[4]) * .5
 								local dy = (vecs[4] - vecs[1] + vecs[3] - vecs[2]) * .5
 								local n = vec3.cross(dx, dy)
-								gl.glNormal3d(n[1], n[2], n[3])
 								local bad = false
 								for j,i in ipairs(indexes) do
 									for k=1,3 do
@@ -342,83 +333,163 @@ void main() {
 								end
 								if not bad then
 									for j=1,4 do
-										gl.glVertex3d(unpack(qvtx[j]))
+										for k=1,3 do
+											vertexes:insert(qvtx[j][k])
+											normals:insert(n[k])
+										end
 									end
 								end
 							end
 						end
-						gl.glEnd()
+print('building graph...')						
+						graph.obj = GLSceneObject{
+							program = {
+								version = 'latest',
+								precision = 'best',
+								vertexCode = [[
+layout(location = 0) in vec3 vertex;
+layout(location = 1) in vec3 normal;
+out vec3 worldCoordv;
+out vec3 eyePosv;
+out vec3 normalv;
+uniform mat4 mvMat;
+uniform mat4 projMat;
+void main() {
+	normalv = normalize((mvMat * vec4(normal, 0.)).xyz);
+	worldCoordv = vertex;
+	vec4 viewCoords = mvMat * vec4(vertex, 1.);
+	gl_Position = projMat * viewCoords;
+
+	eyePosv = (mvMat * vec4(0., 0., 0., 1.)).xyz;
+}
+]],
+								fragmentCode = [[
+in vec3 worldCoordv;
+in vec3 eyePosv;
+in vec3 normalv;
+out vec4 fragColor;
+uniform vec4 color;
+void main() {
+	// TODO FIXME
+	vec3 surfaceToLightNormalized = normalize(worldCoordv);
+	vec3 viewDir = -normalize(eyePosv);
+	float cosNormalToLightAngle = dot(surfaceToLightNormalized, normalv);
+
+	vec3 lightColor =
+		color.xyz * abs(cosNormalToLightAngle)
+		+ vec3(1., 1., 1.) * pow(	// specular
+			abs(dot(viewDir, reflect(-surfaceToLightNormalized, normalv))),
+			127.					// shininess
+		);
+
+	fragColor = vec4(lightColor, color.w);
+}
+]],
+								uniforms = {
+									color = {graph.color[1], graph.color[2], graph.color[3], .8},
+								},
+							},
+							geometry = {
+								mode = gl.GL_QUADS,
+							},
+							vertexes = {
+								data = vertexes,
+								dim = 3,
+							},
+							attrs = {
+								normal = {
+									buffer = {
+										data = normals,
+										dim = 3,
+									},
+								},
+							},
+						}						
 						--]]
 					else
-						gl.glBegin(gl.GL_POINTS)
+						local data = table()
 						for i=1,graph.length do
 							local v = {graph[cols[1]][i], graph[cols[2]][i], graph[cols[3]][i]}
 							for j=1,3 do
 								v[j] = (v[j] - mins[j]) / (maxs[j] - mins[j]) * 2 - 1
+								data:insert(v[j])
 							end
-							gl.glVertex3d(unpack(v))
 						end
-						gl.glEnd()
+						graph.obj = GLSceneObject{
+							program = {
+								version = 'latest',
+								precision = 'best',
+								vertexCode = [[
+in vec3 vertex;
+uniform mat4 mvProjMat;
+void main() {
+	gl_Position = mvProjMat * vec4(vertex, 1.);
+}
+]],
+								fragmentCode = [[
+uniform vec4 color;
+out vec4 fragColor;
+void main() {
+	fragColor = color;
+}
+]],
+								uniforms = {
+									color = {graph.color[1], graph.color[2], graph.color[3], .8},
+								},
+							},
+							geometry = {
+								mode = gl.GL_POINTS,
+							},
+							vertexes = {
+								data = data,
+								dim = 3,
+							},
+						}					
 					end
 				end
 			end
-		end)
-
-		gl.glDisable(gl.GL_LIGHTING)
+		end
 
 		gl.glDisable(gl.GL_DEPTH_TEST)
+		--[[
 		gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
-		--glCallOrRun(list)
+		glCallOrRun(list)
 		gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
+		--]]
 
-		local drawText3D
-		local matrix = require 'matrix.ffi'
-		local mvMat = matrix({4,4}, 'float'):zeros()
-		local projMat = matrix({4,4}, 'float'):zeros()
-		local mvProjMat = matrix({4,4}, 'float'):zeros()
-		-- TODO just refresh once per frame or something
-		local function refreshMatrices()
-			gl.glGetFloatv(gl.GL_MODELVIEW_MATRIX, mvMat.ptr)
-			gl.glGetFloatv(gl.GL_PROJECTION_MATRIX, projMat.ptr)
-			mvProjMat:mul4x4(projMat, mvMat)
-		end
-		do
-			function drawText3D(pt, text)
-				refreshMatrices()
-				pt = vec4d(mat4x4vecmul(mvProjMat.ptr, pt:unpack()))
-				pt = vec3d(homogeneous(pt:unpack()))
-				for i=0,2 do
-					if pt.s[i] < -1 or pt.s[i] > 1 then return end
-				end
-				pt = (pt * .5 + vec3d(.5, .5, .5))
-				local w,h = gui:sysSize()
-				pt.x = pt.x * w
-				pt.y = pt.y * h
-
-				gl.glMatrixMode(gl.GL_PROJECTION)
-				gl.glPushMatrix()
-				gl.glLoadIdentity()
-				gl.glOrtho(0, w, 0, h, -1, 1)
-				gl.glMatrixMode(gl.GL_MODELVIEW)
-				gl.glPushMatrix()
-				gl.glLoadIdentity()
-
-				gui.font:draw{
-					pos = vec3(pt:unpack()),
-					fontSize = {1,-1},
-					text = text,
-					size = {w,h},
-				}
-
-				gl.glMatrixMode(gl.GL_PROJECTION)
-				gl.glPopMatrix()
-				gl.glMatrixMode(gl.GL_MODELVIEW)
-				gl.glPopMatrix()
+		local function drawText3D(pt, text)
+			pt = vec4d(mat4x4vecmul(mvProjMat.ptr, pt:unpack()))
+			pt = vec3d(homogeneous(pt:unpack()))
+			for i=0,2 do
+				if pt.s[i] < -1 or pt.s[i] > 1 then return end
 			end
+			pt = (pt * .5 + vec3d(.5, .5, .5))
+			local w,h = gui:sysSize()
+			pt.x = pt.x * w
+			pt.y = pt.y * h
+
+			gl.glMatrixMode(gl.GL_PROJECTION)
+			gl.glPushMatrix()
+			gl.glLoadIdentity()
+			gl.glOrtho(0, w, 0, h, -1, 1)
+			gl.glMatrixMode(gl.GL_MODELVIEW)
+			gl.glPushMatrix()
+			gl.glLoadIdentity()
+
+			gui.font:draw{
+				pos = vec3(pt:unpack()),
+				fontSize = {1,-1},
+				text = text,
+				size = {w,h},
+			}
+
+			gl.glMatrixMode(gl.GL_PROJECTION)
+			gl.glPopMatrix()
+			gl.glMatrixMode(gl.GL_MODELVIEW)
+			gl.glPopMatrix()
 		end
 
 		local function drawLine(args)
-			refreshMatrices()
 			self.lineObj.uniforms.mvProjMat = mvProjMat.ptr
 			local vtxs = self.lineObj:beginUpdate()
 			vtxs:emplace_back():set(args.p1:unpack())
@@ -428,7 +499,6 @@ void main() {
 
 		local function drawTicks(args)
 			local ticks = args.ticks or 8
-			gl.glColor3f(1,1,1)
 			local d = args.p2 - args.p1
 			for i=0,ticks do
 				local center = args.p1 + d*(i/ticks)
