@@ -236,6 +236,9 @@ void main() {
 				useVec = true,
 				dim = 3,
 			},
+			uniforms = {
+				mvProjMat = self.view.mvProjMat.ptr,
+			},
 		}
 	end
 
@@ -456,30 +459,30 @@ void main() {
 		gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
 		--]]
 
-		local function drawText3D(pt, text)
-			pt = vec4d(mat4x4vecmul(self.view.mvProjMat.ptr, pt:unpack()))
-			pt = vec3d(homogeneous(pt:unpack()))
-			for i=0,2 do
-				if pt.s[i] < -1 or pt.s[i] > 1 then return end
-			end
-			pt = (pt * .5 + vec3d(.5, .5, .5))
-			local w,h = gui:sysSize()
-			pt.x = pt.x * w
-			pt.y = pt.y * h
+		local function drawText3D(text, x, y, z, w)
+			x,y,z,w = mat4x4vecmul(self.view.mvProjMat.ptr, x, y, z, w)
+			x,y,z = homogeneous(x,y,z,w)
+			if x < -1 or x > 1
+			or y < -1 or y > 1
+			or z < -1 or z > 1
+			then return end
 
-			gui.font:draw{
-				pos = vec3(pt:unpack()),
-				fontSize = {1,-1},
-				text = text,
-				size = {w,h},
-			}
+			local w,h = gui:sysSize()
+			x = (x * .5 + .5) * w
+			y = (y * .5 + .5) * h
+
+			gui.font:drawUnpacked(
+				x, y,	-- pos
+				1,-1,	-- fontSize
+				text,	-- text
+				w, h	-- size
+			)
 		end
 
-		local function drawLine(args)
-			self.lineObj.uniforms.mvProjMat = self.view.mvProjMat.ptr
+		local function drawLine(x1, y1, z1, x2, y2, z2)
 			local vtxs = self.lineObj:beginUpdate()
-			vtxs:emplace_back():set(args.p1:unpack())
-			vtxs:emplace_back():set(args.p2:unpack())
+			vtxs:emplace_back():set(x1, y1, z1)
+			vtxs:emplace_back():set(x2, y2, z2)
 			self.lineObj:endUpdate()	-- and draw
 		end
 
@@ -488,12 +491,16 @@ void main() {
 			local d = args.p2 - args.p1
 			for i=0,ticks do
 				local center = args.p1 + d*(i/ticks)
-				drawLine{
-					p1 = center + args.perp*.1,
-					p2 = center - args.perp*.1,
-				}
+				drawLine(
+					center.x + args.perp.x * .1,
+					center.y + args.perp.y * .1,
+					center.z + args.perp.z * .1,
+					center.x - args.perp.x * .1,
+					center.y - args.perp.y * .1,
+					center.z - args.perp.z * .1
+				)
 				local v = (args.to - args.from) * i/ticks + args.from
-				drawText3D(args.perp*.1 + center, tostring(v))
+				drawText3D(tostring(v), (args.perp*.1 + center):unpack())
 			end
 		end
 
@@ -519,29 +526,38 @@ void main() {
 			local axis = vec3d()
 			axis.s[j] = 1
 			drawTicks{
-				p1=fromPt,
-				p2=toPt,
-				perp=fwd:cross(axis),
-				from=from,
-				to=to,
+				p1 = fromPt,
+				p2 = toPt,
+				perp = fwd:cross(axis),
+				from = from,
+				to = to,
 			}
 		end
 
 		for i=1,4 do
 			-- TODO only draw if not in the front
-			drawLine{
-				p1=bottomVtxs[i],
-				p2=bottomVtxs[i%4+1],
-			}
-			drawLine{
-				p1=bottomVtxs[i],
-				p2=bottomVtxs[i] + vec3f(0,0,2),
-			}
+			drawLine(
+				bottomVtxs[i].x,
+				bottomVtxs[i].y,
+				bottomVtxs[i].z,
+				bottomVtxs[i%4+1].x,
+				bottomVtxs[i%4+1].y,
+				bottomVtxs[i%4+1].z
+			)
+			drawLine(
+				bottomVtxs[i].x,
+				bottomVtxs[i].y,
+				bottomVtxs[i].z,
+				bottomVtxs[i].x,
+				bottomVtxs[i].y,
+				bottomVtxs[i].z + 2
+			)
 		end
 
 		gl.glEnable(gl.GL_DEPTH_TEST)
 
 		gui:update()
+		gl.glEnable(gl.GL_BLEND)
 	end
 	local plot3dapp = Plot3DApp()
 	return plot3dapp:run()
