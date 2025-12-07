@@ -1,6 +1,5 @@
 local ffi = require 'ffi'
 local path = require 'ext.path'
-local vec2 = require 'vec.vec2'
 local vec3 = require 'vec.vec3'
 local vec3f = require 'vec-ffi.vec3f'
 local vec3d = require 'vec-ffi.vec3d'
@@ -225,6 +224,7 @@ void main() {
 	fragColor = color;
 }
 ]],
+				-- upload once
 				uniforms = {
 					color = {1,1,1,1},
 				},
@@ -236,6 +236,7 @@ void main() {
 				useVec = true,
 				dim = 3,
 			},
+			-- upload every draw
 			uniforms = {
 				mvProjMat = self.view.mvProjMat.ptr,
 			},
@@ -328,7 +329,9 @@ void main() {
 								end
 								local dx = (vecs[2] - vecs[1] + vecs[3] - vecs[4]) * .5
 								local dy = (vecs[4] - vecs[1] + vecs[3] - vecs[2]) * .5
-								local n = vec3.cross(dx, dy)
+								local nx = dx[2] * dy[3] - dx[3] * dy[2]
+								local ny = dx[3] * dy[1] - dx[1] * dy[3]
+								local nz = dx[1] * dy[2] - dx[2] * dy[1]
 								local bad = false
 								for j,i in ipairs(indexes) do
 									for k=1,3 do
@@ -342,13 +345,15 @@ void main() {
 									for j=1,4 do
 										for k=1,3 do
 											vertexes:insert(qvtx[j][k])
-											normals:insert(n[k])
 										end
+										normals:insert(nx)
+										normals:insert(ny)
+										normals:insert(nz)
 									end
 								end
 							end
 						end
-print('building graph...')						
+print('building graph...')
 						graph.obj = GLSceneObject{
 							program = {
 								version = 'latest',
@@ -467,7 +472,7 @@ void main() {
 			or z < -1 or z > 1
 			then return end
 
-			local w,h = gui:sysSize()
+			local w, h = gui:sysSize()
 			x = (x * .5 + .5) * w
 			y = (y * .5 + .5) * h
 
@@ -481,27 +486,12 @@ void main() {
 
 		local function drawLine(x1, y1, z1, x2, y2, z2)
 			local vtxs = self.lineObj:beginUpdate()
-			vtxs:emplace_back():set(x1, y1, z1)
-			vtxs:emplace_back():set(x2, y2, z2)
+			vtxs:resize(2)
+			local v = vtxs.v+0 
+			v.x, v.y, v.z = x1, y1, z1
+			local v = vtxs.v+1
+			v.x, v.y, v.z = x2, y2, z2
 			self.lineObj:endUpdate()	-- and draw
-		end
-
-		local function drawTicks(args)
-			local ticks = args.ticks or 8
-			local d = args.p2 - args.p1
-			for i=0,ticks do
-				local center = args.p1 + d*(i/ticks)
-				drawLine(
-					center.x + args.perp.x * .1,
-					center.y + args.perp.y * .1,
-					center.z + args.perp.z * .1,
-					center.x - args.perp.x * .1,
-					center.y - args.perp.y * .1,
-					center.z - args.perp.z * .1
-				)
-				local v = (args.to - args.from) * i/ticks + args.from
-				drawText3D(tostring(v), (args.perp*.1 + center):unpack())
-			end
 		end
 
 		-- project view -z
@@ -525,33 +515,44 @@ void main() {
 			toPt.s[j] = -toPt.s[j]
 			local axis = vec3d()
 			axis.s[j] = 1
-			drawTicks{
-				p1 = fromPt,
-				p2 = toPt,
-				perp = fwd:cross(axis),
-				from = from,
-				to = to,
-			}
+	
+			local perpX = fwd.y * axis.z - fwd.z * axis.y
+			local perpY = fwd.z * axis.x - fwd.x * axis.z
+			local perpZ = fwd.x * axis.y - fwd.y * axis.x
+		
+			local ticks = 8
+			for i=0,ticks do
+				local f = i / ticks
+				local centerX = fromPt.x * (1-f) + toPt.x * f
+				local centerY = fromPt.y * (1-f) + toPt.y * f
+				local centerZ = fromPt.z * (1-f) + toPt.z * f
+				drawLine(
+					centerX + perpX * .1,
+					centerY + perpY * .1,
+					centerZ + perpZ * .1,
+					centerX - perpX * .1,
+					centerY - perpY * .1,
+					centerZ - perpZ * .1
+				)
+				drawText3D(
+					tostring(from * (1-f) + to * f),
+					perpX * .1 + centerX,
+					perpY * .1 + centerY,
+					perpZ * .1 + centerZ
+				)
+			end
 		end
 
 		for i=1,4 do
 			-- TODO only draw if not in the front
+			local v1 = bottomVtxs[i]
+			local v2 = bottomVtxs[i%4+1]
 			drawLine(
-				bottomVtxs[i].x,
-				bottomVtxs[i].y,
-				bottomVtxs[i].z,
-				bottomVtxs[i%4+1].x,
-				bottomVtxs[i%4+1].y,
-				bottomVtxs[i%4+1].z
-			)
+				v1.x, v1.y, v1.z,
+				v2.x, v2.y, v2.z)
 			drawLine(
-				bottomVtxs[i].x,
-				bottomVtxs[i].y,
-				bottomVtxs[i].z,
-				bottomVtxs[i].x,
-				bottomVtxs[i].y,
-				bottomVtxs[i].z + 2
-			)
+				v1.x, v1.y, v1.z,
+				v1.x, v1.y, v1.z + 2)
 		end
 
 		gl.glEnable(gl.GL_DEPTH_TEST)
