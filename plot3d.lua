@@ -9,8 +9,8 @@ local vec4f = require 'vec-ffi.vec4f'
 local vec4d = require 'vec-ffi.vec4d'
 local box2 = require 'vec.box2'
 local gl = require 'gl'
-local sdl = require 'sdl'
 local glCallOrRun = require 'gl.call'
+local GLSceneObject = require 'gl.sceneobject'
 local GUI = require 'gui'
 
 
@@ -223,6 +223,38 @@ local function plot3d(graphs, numRows, fontfile)
 		gl.glLightfv(gl.GL_LIGHT0, gl.GL_SPECULAR, vec4f(1,1,1,1).s)
 		gl.glLightfv(gl.GL_LIGHT0, gl.GL_POSITION, vec4f(0,0,0,1).s)
 		gl.glEnable(gl.GL_LIGHT0)
+	
+
+		self.lineObj = GLSceneObject{
+			program = {
+				precision = 'best',
+				version = 'latest',
+				vertexCode = [[
+in vec3 vertex;
+uniform mat4 mvProjMat;
+void main() {
+	gl_Position = mvProjMat * vec4(vertex, 1.);
+}
+]],
+				fragmentCode = [[
+uniform vec4 color;
+out vec4 fragColor;
+void main() {
+	fragColor = color;
+}
+]],
+				uniforms = {
+					color = {1,1,1,1},
+				},
+			},
+			geometry = {
+				mode = gl.GL_LINES,
+			},
+			vertexes = {
+				useVec = true,
+				dim = 3,
+			},
+		}
 	end
 
 	function Plot3DApp:update()
@@ -340,17 +372,20 @@ local function plot3d(graphs, numRows, fontfile)
 		gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
 
 		local drawText3D
+		local matrix = require 'matrix.ffi'
+		local mvMat = matrix({4,4}, 'float'):zeros()
+		local projMat = matrix({4,4}, 'float'):zeros()
+		local mvProjMat = matrix({4,4}, 'float'):zeros()
+		-- TODO just refresh once per frame or something
+		local function refreshMatrices()
+			gl.glGetFloatv(gl.GL_MODELVIEW_MATRIX, mvMat.ptr)
+			gl.glGetFloatv(gl.GL_PROJECTION_MATRIX, projMat.ptr)
+			mvProjMat:mul4x4(projMat, mvMat)
+		end
 		do
-			local matrix = require 'matrix.ffi'
-			local mvMat = matrix({4,4}, 'float'):zeros()
-			local projMat = matrix({4,4}, 'float'):zeros()
 			function drawText3D(pt, text)
-				local mv = mvMat.ptr
-				local proj = projMat.ptr
-				gl.glGetFloatv(gl.GL_MODELVIEW_MATRIX, mv)
-				gl.glGetFloatv(gl.GL_PROJECTION_MATRIX, proj)
-				pt = vec4d(mat4x4vecmul(mv, pt:unpack()))
-				pt = vec4d(mat4x4vecmul(proj, pt:unpack()))
+				refreshMatrices()
+				pt = vec4d(mat4x4vecmul(mvProjMat.ptr, pt:unpack()))
 				pt = vec3d(homogeneous(pt:unpack()))
 				for i=0,2 do
 					if pt.s[i] < -1 or pt.s[i] > 1 then return end
@@ -359,6 +394,7 @@ local function plot3d(graphs, numRows, fontfile)
 				local w,h = gui:sysSize()
 				pt.x = pt.x * w
 				pt.y = pt.y * h
+
 				gl.glMatrixMode(gl.GL_PROJECTION)
 				gl.glPushMatrix()
 				gl.glLoadIdentity()
@@ -366,12 +402,14 @@ local function plot3d(graphs, numRows, fontfile)
 				gl.glMatrixMode(gl.GL_MODELVIEW)
 				gl.glPushMatrix()
 				gl.glLoadIdentity()
+
 				gui.font:draw{
 					pos = vec3(pt:unpack()),
 					fontSize = {1,-1},
 					text = text,
 					size = {w,h},
 				}
+
 				gl.glMatrixMode(gl.GL_PROJECTION)
 				gl.glPopMatrix()
 				gl.glMatrixMode(gl.GL_MODELVIEW)
@@ -380,10 +418,12 @@ local function plot3d(graphs, numRows, fontfile)
 		end
 
 		local function drawLine(args)
-			gl.glBegin(gl.GL_LINES)
-			gl.glVertex3d(args.p1:unpack())
-			gl.glVertex3d(args.p2:unpack())
-			gl.glEnd()
+			refreshMatrices()
+			self.lineObj.uniforms.mvProjMat = mvProjMat.ptr
+			local vtxs = self.lineObj:beginUpdate()
+			vtxs:emplace_back():set(args.p1:unpack())
+			vtxs:emplace_back():set(args.p2:unpack())
+			self.lineObj:endUpdate()	-- and draw
 		end
 
 		local function drawTicks(args)
@@ -392,11 +432,10 @@ local function plot3d(graphs, numRows, fontfile)
 			local d = args.p2 - args.p1
 			for i=0,ticks do
 				local center = args.p1 + d*(i/ticks)
-				gl.glBegin(gl.GL_LINES)
-				gl.glVertex3f((center + args.perp*.1):unpack())
-				gl.glVertex3f((center - args.perp*.1):unpack())
-				gl.glEnd()
-
+				drawLine{
+					p1 = center + args.perp*.1,
+					p2 = center - args.perp*.1,
+				}
 				local v = (args.to - args.from) * i/ticks + args.from
 				drawText3D(args.perp*.1 + center, tostring(v))
 			end
@@ -447,7 +486,7 @@ local function plot3d(graphs, numRows, fontfile)
 			}
 			drawLine{
 				p1=bottomVtxs[i],
-				p2=bottomVtxs[i]+vec3f(0,0,2),
+				p2=bottomVtxs[i] + vec3f(0,0,2),
 			}
 		end
 
