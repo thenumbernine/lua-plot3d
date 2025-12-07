@@ -33,9 +33,16 @@ local function homogeneous(x,y,z,w)
 	return x,y,z
 end
 
+local colors = {
+	vec3d(1,0,0),
+	vec3d(1,1,0),
+	vec3d(0,1,0),
+	vec3d(0,1,1),
+	vec3d(.3,.3,1),
+	vec3d(1,.2,1),
+}
 
 
-local quad = {{0,0}, {1,0}, {1,1}, {0,1}}
 
 --[[
 graphs = {
@@ -47,14 +54,6 @@ graphs = {
 		...
 	}
 --]]
-local colors = {
-	vec3d(1,0,0),
-	vec3d(1,1,0),
-	vec3d(0,1,0),
-	vec3d(0,1,1),
-	vec3d(.3,.3,1),
-	vec3d(1,.2,1),
-}
 local function plot3d(graphs, numRows, fontfile)
 	for name,graph in pairs(graphs) do
 		if not graph.color then
@@ -126,6 +125,7 @@ local function plot3d(graphs, numRows, fontfile)
 		if #mins == 0 then mins = {-1,-1,-1} end
 		if #maxs == 0 then maxs = {1,1,1} end
 	end
+	resetView()
 
 	local function scaleToMinMax(x, y, z)
 		return
@@ -133,8 +133,6 @@ local function plot3d(graphs, numRows, fontfile)
 			(y - mins[2]) / (maxs[2] - mins[2]) * 2 - 1,
 			(z - mins[3]) / (maxs[3] - mins[3]) * 2 - 1
 	end
-
-	resetView()
 
 	local Plot3DApp = require 'glapp.orbit'()
 
@@ -182,14 +180,14 @@ local function plot3d(graphs, numRows, fontfile)
 		for i,name in ipairs(names) do
 			local graph = graphs[name]
 			gui:widget{
-				class=Text,
-				text=name,
-				parent={gui.root},
-				pos={x,y},
-				fontSize={2,2},
-				graph=graph,
-				fontColor={colorForEnabled(graph)},
-				mouseEvent=function(menu,event,x,y)
+				class = Text,
+				text = name,
+				parent = {gui.root},
+				pos = {x,y},
+				fontSize = {2, 2},
+				graph = graph,
+				fontColor = {colorForEnabled(graph)},
+				mouseEvent = function(menu,event,x,y)
 					if bit.band(event,1) ~= 0 then	-- left press
 						graph.enabled = not graph.enabled
 						menu:fontColor(colorForEnabled(graph))
@@ -245,6 +243,36 @@ void main() {
 				mvProjMat = self.view.mvProjMat.ptr,
 			},
 		}
+	end
+
+	function Plot3DApp:drawLine(x1, y1, z1, x2, y2, z2)
+		local vtxs = self.lineObj:beginUpdate()
+		vtxs:resize(2)
+		local v = vtxs.v+0
+		v.x, v.y, v.z = x1, y1, z1
+		local v = vtxs.v+1
+		v.x, v.y, v.z = x2, y2, z2
+		self.lineObj:endUpdate()	-- and draw
+	end
+
+	function Plot3DApp:drawText3D(text, x, y, z, w)
+		x,y,z,w = mat4x4vecmul(self.view.mvProjMat.ptr, x, y, z, w)
+		x,y,z = homogeneous(x,y,z,w)
+		if x < -1 or x > 1
+		or y < -1 or y > 1
+		or z < -1 or z > 1
+		then return end
+
+		local w, h = gui:sysSize()
+		x = (x * .5 + .5) * w
+		y = (y * .5 + .5) * h
+
+		gui.font:drawUnpacked(
+			x, y,	-- pos
+			1,-1,	-- fontSize
+			text,	-- text
+			w, h	-- size
+		)
 	end
 
 	local bottomVtxs = {
@@ -380,7 +408,7 @@ void main() {
 						for basey=1,#graph.eols-2 do
 							for basex=1,graph.eols[1]-1 do
 								-- position data in center of view
-								local ofsx, ofsy = table.unpack(quad[1])
+								local ofsx, ofsy = 0, 0
 								local index = (graph.eols[basey + ofsy] or 0) + basex + ofsx
 								local ax = colA[index]
 								local ay = colB[index]
@@ -388,7 +416,7 @@ void main() {
 								if not (math.isfinite(ax) and math.isfinite(ay) and math.isfinite(az)) then goto bad end
 								ax, ay, az = scaleToMinMax(ax, ay, az)
 								
-								local ofsx, ofsy = table.unpack(quad[2])
+								local ofsx, ofsy = 1, 0
 								local index = (graph.eols[basey + ofsy] or 0) + basex + ofsx
 								local bx = colA[index]
 								local by = colB[index]
@@ -396,7 +424,7 @@ void main() {
 								if not (math.isfinite(bx) and math.isfinite(by) and math.isfinite(bz)) then goto bad end
 								bx, by, bz = scaleToMinMax(bx, by, bz)
 
-								local ofsx, ofsy = table.unpack(quad[3])
+								local ofsx, ofsy = 1, 1
 								local index = (graph.eols[basey + ofsy] or 0) + basex + ofsx
 								local cx = colA[index]
 								local cy = colB[index]
@@ -404,7 +432,7 @@ void main() {
 								if not (math.isfinite(cx) and math.isfinite(cy) and math.isfinite(cz)) then goto bad end
 								cx, cy, cz = scaleToMinMax(cx, cy, cz)
 
-								local ofsx, ofsy = table.unpack(quad[4])
+								local ofsx, ofsy = 0, 1
 								local index = (graph.eols[basey + ofsy] or 0) + basex + ofsx
 								local dx = colA[index]
 								local dy = colB[index]
@@ -486,41 +514,12 @@ void main() {
 		end
 
 		gl.glDisable(gl.GL_DEPTH_TEST)
+
 		--[[
 		gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
 		glCallOrRun(list)
 		gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
 		--]]
-
-		local function drawText3D(text, x, y, z, w)
-			x,y,z,w = mat4x4vecmul(self.view.mvProjMat.ptr, x, y, z, w)
-			x,y,z = homogeneous(x,y,z,w)
-			if x < -1 or x > 1
-			or y < -1 or y > 1
-			or z < -1 or z > 1
-			then return end
-
-			local w, h = gui:sysSize()
-			x = (x * .5 + .5) * w
-			y = (y * .5 + .5) * h
-
-			gui.font:drawUnpacked(
-				x, y,	-- pos
-				1,-1,	-- fontSize
-				text,	-- text
-				w, h	-- size
-			)
-		end
-
-		local function drawLine(x1, y1, z1, x2, y2, z2)
-			local vtxs = self.lineObj:beginUpdate()
-			vtxs:resize(2)
-			local v = vtxs.v+0
-			v.x, v.y, v.z = x1, y1, z1
-			local v = vtxs.v+1
-			v.x, v.y, v.z = x2, y2, z2
-			self.lineObj:endUpdate()	-- and draw
-		end
 
 		-- project view -z
 		local viewRot = self.view.angle
@@ -530,6 +529,9 @@ void main() {
 		-- draw a box around it
 		-- draw tickers along each axis at specific spacing ... 5 tics per axii?
 		local v = vec3d()
+		local fromPt = vec3d()
+		local toPt = vec3d()
+
 		v.x = (right.x < 0) and -1 or 1
 		v.y = (right.y < 0) and -1 or 1
 		v.z = -1
@@ -538,15 +540,17 @@ void main() {
 			local from = mins[j+1]
 			local to = maxs[j+1]
 			if v.s[j] > 0 then from,to = to,from end
-			local fromPt = v:clone()
-			local toPt = v:clone()
+			fromPt:set(v:unpack())
+			toPt:set(v:unpack())
 			toPt.s[j] = -toPt.s[j]
-			local axis = vec3d()
-			axis.s[j] = 1
+			
+			local axisX = j == 0 and 1 or 0
+			local axisY = j == 1 and 1 or 0
+			local axisZ = j == 2 and 1 or 0
 
-			local perpX = fwd.y * axis.z - fwd.z * axis.y
-			local perpY = fwd.z * axis.x - fwd.x * axis.z
-			local perpZ = fwd.x * axis.y - fwd.y * axis.x
+			local perpX = fwd.y * axisZ - fwd.z * axisY
+			local perpY = fwd.z * axisX - fwd.x * axisZ
+			local perpZ = fwd.x * axisY - fwd.y * axisX
 
 			local ticks = 8
 			for i=0,ticks do
@@ -554,7 +558,7 @@ void main() {
 				local centerX = fromPt.x * (1-f) + toPt.x * f
 				local centerY = fromPt.y * (1-f) + toPt.y * f
 				local centerZ = fromPt.z * (1-f) + toPt.z * f
-				drawLine(
+				self:drawLine(
 					centerX + perpX * .1,
 					centerY + perpY * .1,
 					centerZ + perpZ * .1,
@@ -562,7 +566,7 @@ void main() {
 					centerY - perpY * .1,
 					centerZ - perpZ * .1
 				)
-				drawText3D(
+				self:drawText3D(
 					tostring(from * (1-f) + to * f),
 					perpX * .1 + centerX,
 					perpY * .1 + centerY,
@@ -575,10 +579,10 @@ void main() {
 			-- TODO only draw if not in the front
 			local v1 = bottomVtxs[i]
 			local v2 = bottomVtxs[i%4+1]
-			drawLine(
+			self:drawLine(
 				v1.x, v1.y, v1.z,
 				v2.x, v2.y, v2.z)
-			drawLine(
+			self:drawLine(
 				v1.x, v1.y, v1.z,
 				v1.x, v1.y, v1.z + 2)
 		end
@@ -586,6 +590,8 @@ void main() {
 		gl.glEnable(gl.GL_DEPTH_TEST)
 
 		gui:update()
+		
+		-- TODO this wasn't needed in immediate-mode rendering, something is wrong in retained-mode GUI
 		gl.glEnable(gl.GL_BLEND)
 	end
 	local plot3dapp = Plot3DApp()
