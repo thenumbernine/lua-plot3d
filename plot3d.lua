@@ -349,30 +349,25 @@ print('building graph...')
 								vertexCode = [[
 layout(location = 0) in vec3 vertex;
 layout(location = 1) in vec3 normal;
-out vec3 worldCoordv;
-out vec3 eyePosv;
+out vec3 surfaceToLightNormalized;
 out vec3 normalv;
 uniform mat4 mvMat;
-uniform mat4 projMat;
+uniform mat4 mvProjMat;
 void main() {
 	normalv = normalize((mvMat * vec4(normal, 0.)).xyz);
-	worldCoordv = vertex;
-	vec4 viewCoords = mvMat * vec4(vertex, 1.);
-	gl_Position = projMat * viewCoords;
-
-	eyePosv = (mvMat * vec4(0., 0., 0., 1.)).xyz;
+	surfaceToLightNormalized = -normalize((mvMat * vec4(vertex, 1.)).xyz);
+	gl_Position = mvProjMat * vec4(vertex, 1.);
 }
 ]],
 								fragmentCode = [[
-in vec3 worldCoordv;
-in vec3 eyePosv;
+in vec3 surfaceToLightNormalized;
 in vec3 normalv;
 out vec4 fragColor;
 uniform vec4 color;
+uniform mat4 mvMat;
 void main() {
-	// TODO FIXME
-	vec3 surfaceToLightNormalized = normalize(worldCoordv);
-	vec3 viewDir = -normalize(eyePosv);
+	vec3 eyePosv = mvMat[3].xyz;
+	const vec3 viewDir = vec3(0., 0., 1.);
 	float cosNormalToLightAngle = dot(surfaceToLightNormalized, normalv);
 
 	vec3 lightColor =
