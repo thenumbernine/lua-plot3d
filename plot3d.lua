@@ -4,9 +4,7 @@ local vec3f = require 'vec-ffi.vec3f'
 local vec3d = require 'vec-ffi.vec3d'
 local vec4d = require 'vec-ffi.vec4d'
 local matrix = require 'matrix.ffi'
-local box2 = require 'vec.box2'
 local gl = require 'gl'
-local glCallOrRun = require 'gl.call'
 local GLSceneObject = require 'gl.sceneobject'
 local GUI = require 'gui'
 
@@ -373,49 +371,46 @@ void main() {
 							},
 						}
 
-						local indexes = {}
-						local qvtx = {{}, {}, {}, {}}
-
 						local vertexes = graph.obj.attrs.vertex.buffer:beginUpdate()
 						local normals = graph.obj.attrs.normal.buffer:beginUpdate()
 
-						local colA, colB, colC = table.unpack(cols)
+						local colA = graph[cols[1]]
+						local colB = graph[cols[2]]
+						local colC = graph[cols[3]]
 						for basey=1,#graph.eols-2 do
 							for basex=1,graph.eols[1]-1 do
-								for ofsi,ofs in ipairs(quad) do
-									local x = basex + ofs[1]
-									local y = basey + ofs[2]
-									indexes[ofsi] = (graph.eols[y-1] or 0) + x
-								end
-
 								-- position data in center of view
-								local ax = graph[colA][indexes[1]]
-								local ay = graph[colB][indexes[1]]
-								local az = graph[colC][indexes[1]]
+								local ofsx, ofsy = table.unpack(quad[1])
+								local index = (graph.eols[basey + ofsy] or 0) + basex + ofsx
+								local ax = colA[index]
+								local ay = colB[index]
+								local az = colC[index]
 								if not (math.isfinite(ax) and math.isfinite(ay) and math.isfinite(az)) then goto bad end
 								ax, ay, az = scaleToMinMax(ax, ay, az)
-								qvtx[1][1], qvtx[1][2], qvtx[1][3] = ax, ay, az
 								
-								local bx = graph[colA][indexes[2]]
-								local by = graph[colB][indexes[2]]
-								local bz = graph[colC][indexes[2]]
+								local ofsx, ofsy = table.unpack(quad[2])
+								local index = (graph.eols[basey + ofsy] or 0) + basex + ofsx
+								local bx = colA[index]
+								local by = colB[index]
+								local bz = colC[index]
 								if not (math.isfinite(bx) and math.isfinite(by) and math.isfinite(bz)) then goto bad end
 								bx, by, bz = scaleToMinMax(bx, by, bz)
-								qvtx[2][1], qvtx[2][2], qvtx[2][3] = bx, by, bz
 
-								local cx = graph[colA][indexes[3]]
-								local cy = graph[colB][indexes[3]]
-								local cz = graph[colC][indexes[3]]
+								local ofsx, ofsy = table.unpack(quad[3])
+								local index = (graph.eols[basey + ofsy] or 0) + basex + ofsx
+								local cx = colA[index]
+								local cy = colB[index]
+								local cz = colC[index]
 								if not (math.isfinite(cx) and math.isfinite(cy) and math.isfinite(cz)) then goto bad end
 								cx, cy, cz = scaleToMinMax(cx, cy, cz)
-								qvtx[3][1], qvtx[3][2], qvtx[3][3] = cx, cy, cz
 
-								local dx = graph[colA][indexes[4]]
-								local dy = graph[colB][indexes[4]]
-								local dz = graph[colC][indexes[4]]
+								local ofsx, ofsy = table.unpack(quad[4])
+								local index = (graph.eols[basey + ofsy] or 0) + basex + ofsx
+								local dx = colA[index]
+								local dy = colB[index]
+								local dz = colC[index]
 								if not (math.isfinite(dx) and math.isfinite(dy) and math.isfinite(dz)) then goto bad end
 								dx, dy, dz = scaleToMinMax(dx, dy, dz)
-								qvtx[4][1], qvtx[4][2], qvtx[4][3] = dx, dy, dz
 
 								local dxX = (bx - ax + cx - dx) * .5
 								local dxY = (by - ay + cy - dy) * .5
