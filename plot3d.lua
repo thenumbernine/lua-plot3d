@@ -8,9 +8,6 @@ local gl = require 'gl'
 local GLSceneObject = require 'gl.sceneobject'
 local GUI = require 'gui'
 
-GUI.drawImmediateMode = false
-require 'gui.font'.drawImmediateMode = false
-
 
 local function mat4x4vecmul(m, x, y, z, w)
 	x = tonumber(x)
@@ -141,10 +138,6 @@ local function plot3d(graphs, numRows, fontfile)
 	function Plot3DApp:initGL(...)
 		if Plot3DApp.super.initGL then
 			Plot3DApp.super.initGL(self, ...)
-		end
-		if not fontfile or not path(fontfile):exists() then
-			-- TODO resolve path to `require 'gui'`
-			fontfile = os.getenv'LUA_PROJECT_PATH'..'/plot3d/font.png'
 		end
 
 		gui = GUI{font=fontfile}

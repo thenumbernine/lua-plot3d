@@ -6,7 +6,6 @@ name = "plot3d"
 files = {
 	"README.md",
 	"distinfo",
-	"font.png",
 	"plot3d-dev-1.rockspec",
 	"plot3d.lua",
 	"run.lua",
