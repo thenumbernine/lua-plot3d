@@ -15,6 +15,5 @@ deps = {
 	"gl",
 	"glapp",
 	"gui",
-	"matrix",
 	"vec-ffi",
 }
