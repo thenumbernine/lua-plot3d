@@ -130,7 +130,7 @@ local function plot3d(graphs, numRows, fontfile)
 			(z - mins[3]) / (maxs[3] - mins[3]) * 2 - 1
 	end
 
-	local Plot3DApp = require 'glapp.orbit'()
+	local Plot3DApp = require 'app3d.orbit'()
 
 	Plot3DApp.viewDist = 3
 
@@ -140,7 +140,7 @@ local function plot3d(graphs, numRows, fontfile)
 		end
 
 		gui = GUI{font=fontfile, mouse=self.mouse}
-		gui.view = require 'glapp.view'()
+		gui.view = require 'app3d.view'()
 		gui.font.view = gui.view
 
 		local names = table()

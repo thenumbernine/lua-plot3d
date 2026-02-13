@@ -11,9 +11,9 @@ files = {
 	"run.lua",
 }
 deps = {
+	"app3d",
 	"ext",
 	"gl",
-	"glapp",
 	"gui",
 	"vec-ffi",
 }
