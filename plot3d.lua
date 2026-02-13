@@ -139,7 +139,7 @@ local function plot3d(graphs, numRows, fontfile)
 			Plot3DApp.super.initGL(self, ...)
 		end
 
-		gui = GUI{font=fontfile}
+		gui = GUI{font=fontfile, mouse=self.mouse}
 		gui.view = require 'glapp.view'()
 		gui.font.view = gui.view
 
@@ -248,7 +248,7 @@ void main() {
 	end
 
 	function Plot3DApp:drawText3D(text, x, y, z, w)
-		x,y,z,w = mat4x4vecmul(self.view.mvProjMat.ptr, x, y, z, w)
+		x,y,z,w = self.view.mvProjMat:mul4x4v4(x, y, z, w)
 		x,y,z = homogeneous(x,y,z,w)
 		if x < -1 or x > 1
 		or y < -1 or y > 1
