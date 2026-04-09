@@ -162,7 +162,7 @@ local function plot3d(graphs, numRows, fontfile)
 		coordText = gui:widget{
 			class=Text,
 			text='',
-			parent={gui.root},
+			parent=gui.root,
 			pos={0,0},
 			fontSize={2,2}
 		}
@@ -174,7 +174,7 @@ local function plot3d(graphs, numRows, fontfile)
 			gui:widget{
 				class = Text,
 				text = name,
-				parent = {gui.root},
+				parent = gui.root,
 				pos = {x,y},
 				fontSize = {2, 2},
 				graph = graph,
